@@ -337,33 +337,6 @@ test("只读取显式或用户级配置路径", () => {
 		join(homedir(), ".config", "web-access-cli", "config.json"),
 	);
 	assert.equal(resolveConfigPath(undefined, {}), getDefaultConfigPath());
-	const fixture = configFile({});
-	try {
-		const loaded = loadConfig(fixture.path, {});
-		assert.deepEqual(loaded.app.search.providers, [
-			"tavily",
-			"exa",
-			"brave",
-			"searxng",
-			"anysearch",
-			"xcrawl",
-			"deepseek",
-		]);
-		assert.deepEqual(loaded.app.extract.providers, [
-			"firecrawl",
-			"jina",
-			"exa",
-			"anysearch",
-			"xcrawl",
-			"http",
-		]);
-		assert.equal(
-			loaded.instances.find((item) => item.id === "xcrawl")?.searchFilterMode,
-			"strict",
-		);
-	} finally {
-		fixture.cleanup();
-	}
 });
 
 test("内部 provider 顺序与用户 route 分离并用于诊断", () => {

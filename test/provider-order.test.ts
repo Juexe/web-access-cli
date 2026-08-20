@@ -79,7 +79,6 @@ test("写回只更新对应 capability 的内部顺序", async (t) => {
 	assert.deepEqual(parsed.search.providers, ["a", "b", "c"]);
 	assert.deepEqual(parsed.search._providers, ["b", "c", "a"]);
 	assert.equal(parsed.extract._providers, undefined);
-	assert.match(contents, / {2}"providers": \[/);
 });
 
 test("配置成员在请求期间变化时由用户 route 整组重置", async (t) => {

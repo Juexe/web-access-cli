@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { WebAccessError } from "../src/core/errors.ts";
 import type {
 	ExtractAdapterRequest,
 	ProviderType,
 	SearchAdapterRequest,
 } from "../src/core/types.ts";
+import { assertOk, parseJsonResponse } from "../src/providers/common.ts";
 import { getAdapter } from "../src/providers/registry.ts";
 import { extractRscMarkdown } from "../src/providers/rsc.ts";
 import { instance, MockTransport, response } from "./helpers.ts";
@@ -27,6 +29,84 @@ function searchRequest(
 		transport,
 	};
 }
+
+test("共享 HTTP helper 统一分类非 2xx 响应", () => {
+	const provider = instance("xcrawl", {
+		id: "shared",
+		apiKey: "known-secret",
+	});
+	const cases = [
+		{ status: 401, code: "auth_error", retryable: false },
+		{ status: 403, code: "auth_error", retryable: false },
+		{ status: 402, code: "quota_exceeded", retryable: true },
+		{ status: 429, code: "rate_limited", retryable: true },
+		{ status: 404, code: "provider_error", retryable: false },
+		{ status: 302, code: "provider_error", retryable: false },
+		{ status: 500, code: "provider_error", retryable: true },
+	] as const;
+
+	for (const item of cases) {
+		assert.throws(
+			() =>
+				assertOk(
+					response({ error: "known-secret rejected" }, { status: item.status }),
+					provider,
+				),
+			(error: unknown) => {
+				assert.ok(
+					error instanceof WebAccessError,
+					`HTTP ${item.status} 应抛出 WebAccessError`,
+				);
+				assert.equal(error.code, item.code, `HTTP ${item.status} code`);
+				assert.equal(
+					error.httpStatus,
+					item.status,
+					`HTTP ${item.status} httpStatus`,
+				);
+				assert.equal(
+					error.retryable,
+					item.retryable,
+					`HTTP ${item.status} retryable`,
+				);
+				assert.doesNotMatch(
+					error.message,
+					/known-secret/,
+					`HTTP ${item.status} 应脱敏已知 key`,
+				);
+				return true;
+			},
+		);
+	}
+});
+
+test("共享 JSON helper 拒绝空响应、非法 JSON 和非对象 JSON", () => {
+	const provider = instance("xcrawl", { id: "shared" });
+	const cases = [
+		{ label: "空响应", body: "", retryable: false },
+		{ label: "非法 JSON", body: "not JSON", retryable: true },
+		{ label: "非对象 JSON", body: "[]", retryable: true },
+	] as const;
+
+	for (const item of cases) {
+		assert.throws(
+			() => parseJsonResponse(response(item.body), provider),
+			(error: unknown) => {
+				assert.ok(
+					error instanceof WebAccessError,
+					`${item.label} 应抛出 WebAccessError`,
+				);
+				assert.equal(error.code, "invalid_response", `${item.label} code`);
+				assert.equal(error.httpStatus, 200, `${item.label} httpStatus`);
+				assert.equal(
+					error.retryable,
+					item.retryable,
+					`${item.label} retryable`,
+				);
+				return true;
+			},
+		);
+	}
+});
 
 test("四个 search adapter 映射为统一 Search Hit", async (t) => {
 	const cases: Array<{
@@ -265,49 +345,6 @@ test("DeepSeek freshness 预检查不发请求", async () => {
 			error.retryable === true,
 	);
 	assert.equal(transport.calls.length, 0);
-});
-
-test("DeepSeek HTTP 与 JSON 错误沿用统一分类", async (t) => {
-	const cases = [
-		{ status: 401, code: "auth_error", retryable: false },
-		{ status: 429, code: "rate_limited", retryable: true },
-		{ status: 500, code: "provider_error", retryable: true },
-	] as const;
-	for (const item of cases) {
-		await t.test(String(item.status), async () => {
-			const transport = new MockTransport(() =>
-				response({ error: "test-key rejected" }, { status: item.status }),
-			);
-			const adapter = getAdapter("deepseek", "search");
-			assert.ok(adapter?.search);
-			const request = searchRequest("deepseek", transport);
-			request.freshness = undefined;
-			await assert.rejects(
-				adapter.search(request),
-				(error: unknown) =>
-					error instanceof Error &&
-					"code" in error &&
-					error.code === item.code &&
-					"retryable" in error &&
-					error.retryable === item.retryable &&
-					!error.message.includes("test-key"),
-			);
-		});
-	}
-	await t.test("invalid JSON", async () => {
-		const transport = new MockTransport(() => response("not JSON"));
-		const adapter = getAdapter("deepseek", "search");
-		assert.ok(adapter?.search);
-		const request = searchRequest("deepseek", transport);
-		request.freshness = undefined;
-		await assert.rejects(
-			adapter.search(request),
-			(error: unknown) =>
-				error instanceof Error &&
-				"code" in error &&
-				error.code === "invalid_response",
-		);
-	});
 });
 
 test("AnySearch Search 使用固定 REST 协议并执行本地域名过滤", async () => {
@@ -580,51 +617,6 @@ test("XCrawl 失败状态与无效响应映射为稳定错误", async (t) => {
 				error.code === "no_usable_content",
 		);
 	});
-	await t.test("invalid JSON", async () => {
-		const transport = new MockTransport(() => response("not JSON"));
-		const adapter = getAdapter("xcrawl", "search");
-		assert.ok(adapter?.search);
-		const request = searchRequest("xcrawl", transport);
-		request.freshness = undefined;
-		await assert.rejects(
-			adapter.search(request),
-			(error: unknown) =>
-				error instanceof Error &&
-				"code" in error &&
-				error.code === "invalid_response",
-		);
-	});
-});
-
-test("XCrawl HTTP 失败沿用统一错误分类", async (t) => {
-	const cases = [
-		{ status: 401, code: "auth_error", retryable: false },
-		{ status: 403, code: "auth_error", retryable: false },
-		{ status: 402, code: "quota_exceeded", retryable: true },
-		{ status: 429, code: "rate_limited", retryable: true },
-		{ status: 500, code: "provider_error", retryable: true },
-	] as const;
-	for (const item of cases) {
-		await t.test(String(item.status), async () => {
-			const transport = new MockTransport(() =>
-				response({ error: "test-key rejected" }, { status: item.status }),
-			);
-			const adapter = getAdapter("xcrawl", "search");
-			assert.ok(adapter?.search);
-			const request = searchRequest("xcrawl", transport);
-			request.freshness = undefined;
-			await assert.rejects(
-				adapter.search(request),
-				(error: unknown) =>
-					error instanceof Error &&
-					"code" in error &&
-					error.code === item.code &&
-					"retryable" in error &&
-					error.retryable === item.retryable &&
-					!error.message.includes("test-key"),
-			);
-		});
-	}
 });
 
 function extractRequest(
