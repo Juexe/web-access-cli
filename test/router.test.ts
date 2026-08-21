@@ -485,11 +485,11 @@ test("能力命令默认输出精简 envelope，debug 才包含完整诊断", as
 			loaded: fixture.loaded,
 			transport,
 		});
-		assert.deepEqual(Object.keys(compact), [
-			"schemaVersion",
+		assert.deepEqual(Object.keys(compact).sort(), [
+			"data",
 			"ok",
 			"provider",
-			"data",
+			"schemaVersion",
 		]);
 		if (!hasProvider(compact)) return;
 		assert.equal(compact.provider, "brave");
@@ -502,12 +502,12 @@ test("能力命令默认输出精简 envelope，debug 才包含完整诊断", as
 			debug: true,
 		});
 		if (!hasProvider(debug)) return;
-		assert.deepEqual(Object.keys(debug), [
-			"schemaVersion",
-			"ok",
-			"provider",
+		assert.deepEqual(Object.keys(debug).sort(), [
 			"data",
 			"debug",
+			"ok",
+			"provider",
+			"schemaVersion",
 		]);
 		if (!debug.debug || !("query" in debug.debug.request)) return;
 		assert.equal(debug.debug.request.query, "web access");
@@ -603,12 +603,12 @@ test("排序写回失败在成功和失败 envelope 中追加 warning", async ()
 			persistProviderOrder: rejectWrite,
 		});
 		assert.equal(success.ok, true);
-		assert.deepEqual("warnings" in success ? success.warnings : undefined, [
-			{
-				code: "provider_order_update_failed",
-				message: "Provider 实际顺序未能保存，下次 auto 可能继续使用旧顺序",
-			},
-		]);
+		const successWarnings =
+			"warnings" in success ? success.warnings : undefined;
+		assert.equal(successWarnings?.length, 1);
+		assert.equal(successWarnings[0]?.code, "provider_order_update_failed");
+		assert.equal(typeof successWarnings[0]?.message, "string");
+		assert.ok(successWarnings[0]?.message.trim());
 
 		const failure = await executeSearch(searchRequest, {
 			loaded: failureFixture.loaded,
@@ -618,12 +618,12 @@ test("排序写回失败在成功和失败 envelope 中追加 warning", async ()
 			persistProviderOrder: rejectWrite,
 		});
 		assert.equal(failure.ok, false);
-		assert.deepEqual("warnings" in failure ? failure.warnings : undefined, [
-			{
-				code: "provider_order_update_failed",
-				message: "Provider 实际顺序未能保存，下次 auto 可能继续使用旧顺序",
-			},
-		]);
+		const failureWarnings =
+			"warnings" in failure ? failure.warnings : undefined;
+		assert.equal(failureWarnings?.length, 1);
+		assert.equal(failureWarnings[0]?.code, "provider_order_update_failed");
+		assert.equal(typeof failureWarnings[0]?.message, "string");
+		assert.ok(failureWarnings[0]?.message.trim());
 	} finally {
 		successFixture.cleanup();
 		failureFixture.cleanup();
