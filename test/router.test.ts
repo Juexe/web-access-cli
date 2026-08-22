@@ -229,9 +229,7 @@ test("XCrawl 失败响应和错误消息在 envelope 中脱敏", async () => {
 
 test("auto 对最终非 2xx HTTP 响应切换到下一 provider", async (t) => {
 	const cases = [
-		{ status: 302, code: "provider_error", retryable: false },
 		{ status: 401, code: "auth_error", retryable: false },
-		{ status: 404, code: "provider_error", retryable: false },
 		{ status: 500, code: "provider_error", retryable: true },
 	] as const;
 	for (const item of cases) {

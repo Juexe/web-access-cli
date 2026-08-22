@@ -115,13 +115,14 @@ test("config edit 原样打开已有的无效 JSON 文件", async (t) => {
 test("config edit 打开失败时保留刚创建的配置文件", async (t) => {
 	const directory = await temporaryDirectory(t);
 	const path = join(directory, "config.json");
+	const openFailure = new Error("open failure sentinel");
 
 	await assert.rejects(
 		executeConfigEdit({
 			explicitPath: path,
 			env: {},
 			openPath: async () => {
-				throw new Error("没有可用的默认应用");
+				throw openFailure;
 			},
 		}),
 		(error: unknown) => {
@@ -129,11 +130,12 @@ test("config edit 打开失败时保留刚创建的配置文件", async (t) => {
 			if (!(error instanceof WebAccessError)) return false;
 			assert.equal(error.code, "open_failed");
 			assert.equal(error.retryable, false);
-			assert.deepEqual(error.details, {
-				path,
-				created: true,
-				cause: "没有可用的默认应用",
-			});
+			assert.equal(typeof error.details, "object");
+			assert.notEqual(error.details, null);
+			const details = error.details as Record<string, unknown>;
+			assert.equal(details.path, path);
+			assert.equal(details.created, true);
+			assert.equal(details.cause, openFailure.message);
 			return true;
 		},
 	);

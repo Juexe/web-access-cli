@@ -341,70 +341,57 @@ test("CLI 将成功 provider 写到队头并在下一进程优先使用", async 
 	assert.deepEqual(requests, { a: 1, b: 2 });
 });
 
-test("CLI 输入错误也只在 stdout 输出一个 JSON envelope，并返回退出码 2", () => {
-	const result = spawnSync(
-		process.execPath,
-		["--import", "tsx", "src/cli.ts", "extract", "ftp://example.com"],
+test("CLI 输入错误保持单 JSON、空 stderr 与退出码契约", async (t) => {
+	const cases = [
 		{
-			cwd: resolve("."),
-			encoding: "utf8",
-			env: { ...process.env, WEB_ACCESS_CONFIG: "" },
+			name: "应用校验错误不受 debug 选项污染",
+			args: ["extract", "ftp://example.com", "--debug"],
+			assertEnvelope: (envelope: Record<string, unknown>) => {
+				assert.equal("command" in envelope, false);
+				assert.equal("debug" in envelope, false);
+			},
 		},
-	);
-	assert.equal(result.status, 2);
-	assert.equal(result.stderr, "");
-	const lines = result.stdout.trim().split(/\r?\n/);
-	assert.equal(lines.length, 1);
-	const envelope = JSON.parse(lines[0] ?? "{}") as {
-		schemaVersion?: number;
-		ok?: boolean;
-		error?: { code?: string };
-	};
-	assert.equal(envelope.ok, false);
-	assert.equal(envelope.error?.code, "invalid_input");
-	assert.equal(envelope.schemaVersion, 2);
-	assert.equal("command" in envelope, false);
-});
-
-test("CLI capability 的 debug 选项不会污染默认精简错误输出", () => {
-	const result = spawnSync(
-		process.execPath,
-		[
-			"--import",
-			"tsx",
-			"src/cli.ts",
-			"extract",
-			"ftp://example.com",
-			"--debug",
-		],
 		{
-			cwd: resolve("."),
-			encoding: "utf8",
-			env: { ...process.env, WEB_ACCESS_CONFIG: "" },
+			name: "Commander 参数解析错误",
+			args: ["search"],
+			assertEnvelope: (envelope: Record<string, unknown>) => {
+				assert.equal("command" in envelope, false);
+			},
 		},
-	);
-	assert.equal(result.status, 2);
-	assert.equal(result.stderr, "");
-	const envelope = JSON.parse(result.stdout) as Record<string, unknown>;
-	assert.equal(envelope.schemaVersion, 2);
-	assert.equal(envelope.ok, false);
-	assert.equal("debug" in envelope, false);
-});
+		{
+			name: "config 缺少 edit 子命令",
+			args: ["config"],
+			assertEnvelope: (envelope: Record<string, unknown>) => {
+				assert.equal(envelope.command, null);
+			},
+		},
+	];
 
-test("CLI 自身的参数解析错误不会向 stderr 泄漏文本", () => {
-	const result = spawnSync(
-		process.execPath,
-		["--import", "tsx", "src/cli.ts", "search"],
-		{ cwd: resolve("."), encoding: "utf8" },
-	);
-	assert.equal(result.status, 2);
-	assert.equal(result.stderr, "");
-	const envelope = JSON.parse(result.stdout) as {
-		ok?: boolean;
-		error?: { code?: string };
-	};
-	assert.equal(envelope.ok, false);
-	assert.equal(envelope.error?.code, "invalid_input");
+	for (const item of cases) {
+		await t.test(item.name, () => {
+			const result = spawnSync(
+				process.execPath,
+				["--import", "tsx", "src/cli.ts", ...item.args],
+				{
+					cwd: resolve("."),
+					encoding: "utf8",
+					env: { ...process.env, WEB_ACCESS_CONFIG: "" },
+				},
+			);
+			assert.equal(result.status, 2);
+			assert.equal(result.stderr, "");
+			const lines = result.stdout.trim().split(/\r?\n/);
+			assert.equal(lines.length, 1);
+			const envelope = JSON.parse(lines[0] ?? "{}") as Record<
+				string,
+				unknown
+			> & { error?: { code?: string } };
+			assert.equal(envelope.schemaVersion, 2);
+			assert.equal(envelope.ok, false);
+			assert.equal(envelope.error?.code, "invalid_input");
+			item.assertEnvelope(envelope);
+		});
+	}
 });
 
 test("CLI 注册 config edit 并向实现转发全局配置路径", async () => {
@@ -468,22 +455,6 @@ test("CLI config edit 的路径错误保持单 JSON 与退出码契约", () => {
 	};
 	assert.equal(envelope.command, "config.edit");
 	assert.equal(envelope.error?.code, "config_error");
-});
-
-test("CLI config 缺少 edit 子命令时返回输入错误 envelope", () => {
-	const result = spawnSync(
-		process.execPath,
-		["--import", "tsx", "src/cli.ts", "config"],
-		{ cwd: resolve("."), encoding: "utf8" },
-	);
-	assert.equal(result.status, 2);
-	assert.equal(result.stderr, "");
-	const envelope = JSON.parse(result.stdout) as {
-		command?: string | null;
-		error?: { code?: string };
-	};
-	assert.equal(envelope.command, null);
-	assert.equal(envelope.error?.code, "invalid_input");
 });
 
 test("CLI 通过符号链接入口运行时仍会执行主程序", () => {

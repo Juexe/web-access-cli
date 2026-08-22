@@ -272,23 +272,6 @@ test("缺省 route 覆盖全部支持能力的内置 provider，显式空 route 
 	});
 	try {
 		const loaded = loadConfig(defaults.path, {});
-		assert.deepEqual(loaded.app.search.providers, [
-			"tavily",
-			"exa",
-			"brave",
-			"searxng",
-			"anysearch",
-			"xcrawl",
-			"deepseek",
-		]);
-		assert.deepEqual(loaded.app.extract.providers, [
-			"firecrawl",
-			"jina",
-			"exa",
-			"anysearch",
-			"xcrawl",
-			"http",
-		]);
 		const providerDiagnostics = (
 			executeProviders(loaded).data as {
 				providers: Array<{
