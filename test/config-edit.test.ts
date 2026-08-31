@@ -50,6 +50,7 @@ test("config edit 创建完整默认配置后再调用系统打开器", async (t
 	assert.deepEqual(parsed.providers, [
 		{ id: "tavily", type: "tavily" },
 		{ id: "exa", type: "exa" },
+		{ id: "bocha", type: "bocha" },
 		{ id: "brave", type: "brave" },
 		{ id: "searxng", type: "searxng" },
 		{ id: "firecrawl", type: "firecrawl" },
@@ -63,6 +64,7 @@ test("config edit 创建完整默认配置后再调用系统打开器", async (t
 		providers: [
 			"tavily",
 			"exa",
+			"bocha",
 			"brave",
 			"searxng",
 			"anysearch",

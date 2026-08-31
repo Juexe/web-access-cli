@@ -114,6 +114,10 @@
                     },
                     {
                       "type": "string",
+                      "const": "bocha"
+                    },
+                    {
+                      "type": "string",
                       "const": "brave"
                     },
                     {
@@ -177,6 +181,10 @@
                           {
                             "type": "string",
                             "const": "exa"
+                          },
+                          {
+                            "type": "string",
+                            "const": "bocha"
                           },
                           {
                             "type": "string",
@@ -269,6 +277,10 @@
                               },
                               {
                                 "type": "string",
+                                "const": "bocha"
+                              },
+                              {
+                                "type": "string",
                                 "const": "brave"
                               },
                               {
@@ -339,6 +351,10 @@
                         {
                           "type": "string",
                           "const": "exa"
+                        },
+                        {
+                          "type": "string",
+                          "const": "bocha"
                         },
                         {
                           "type": "string",
@@ -494,6 +510,10 @@
                     },
                     {
                       "type": "string",
+                      "const": "bocha"
+                    },
+                    {
+                      "type": "string",
                       "const": "brave"
                     },
                     {
@@ -557,6 +577,10 @@
                           {
                             "type": "string",
                             "const": "exa"
+                          },
+                          {
+                            "type": "string",
+                            "const": "bocha"
                           },
                           {
                             "type": "string",
@@ -649,6 +673,10 @@
                               },
                               {
                                 "type": "string",
+                                "const": "bocha"
+                              },
+                              {
+                                "type": "string",
                                 "const": "brave"
                               },
                               {
@@ -719,6 +747,10 @@
                         {
                           "type": "string",
                           "const": "exa"
+                        },
+                        {
+                          "type": "string",
+                          "const": "bocha"
                         },
                         {
                           "type": "string",
@@ -922,6 +954,10 @@
                     },
                     {
                       "type": "string",
+                      "const": "bocha"
+                    },
+                    {
+                      "type": "string",
                       "const": "brave"
                     },
                     {
@@ -985,6 +1021,10 @@
                           {
                             "type": "string",
                             "const": "exa"
+                          },
+                          {
+                            "type": "string",
+                            "const": "bocha"
                           },
                           {
                             "type": "string",
@@ -1077,6 +1117,10 @@
                               },
                               {
                                 "type": "string",
+                                "const": "bocha"
+                              },
+                              {
+                                "type": "string",
                                 "const": "brave"
                               },
                               {
@@ -1147,6 +1191,10 @@
                         {
                           "type": "string",
                           "const": "exa"
+                        },
+                        {
+                          "type": "string",
+                          "const": "bocha"
                         },
                         {
                           "type": "string",
@@ -1353,6 +1401,10 @@
                     {
                       "type": "string",
                       "const": "exa"
+                    },
+                    {
+                      "type": "string",
+                      "const": "bocha"
                     },
                     {
                       "type": "string",

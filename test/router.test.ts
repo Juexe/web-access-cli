@@ -296,6 +296,48 @@ test("auto 对最终非 2xx HTTP 响应切换到下一 provider", async (t) => {
 	}
 });
 
+test("Bocha HTTP 403 记录 quota_exceeded 并自动回退", async () => {
+	const fixture = loadedConfig({
+		providers: [
+			{ id: "bocha", type: "bocha", apiKey: "bocha-key" },
+			{ id: "brave", type: "brave", apiKey: "brave-key" },
+		],
+		search: { providers: ["bocha", "brave"] },
+		extract: { providers: [] },
+	});
+	try {
+		const transport = new MockTransport((url) =>
+			url.includes("bocha")
+				? response({ msg: "quota exhausted" }, { status: 403 })
+				: response({
+						web: {
+							results: [
+								{
+									title: "Brave fallback",
+									url: "https://example.com/fallback",
+									description: "fallback succeeded",
+								},
+							],
+						},
+					}),
+		);
+		const envelope = await executeSearch(searchRequest, {
+			loaded: fixture.loaded,
+			transport,
+			debug: true,
+		});
+		assert.equal(envelope.ok, true);
+		if (!hasProvider(envelope)) return;
+		assert.equal(envelope.provider, "brave");
+		assert.equal(envelope.debug?.attempts[0]?.error?.code, "quota_exceeded");
+		assert.equal(envelope.debug?.attempts[0]?.error?.httpStatus, 403);
+		assert.equal(envelope.debug?.attempts[0]?.error?.retryable, false);
+		assert.equal(transport.calls.length, 2);
+	} finally {
+		fixture.cleanup();
+	}
+});
+
 test("extract auto 在前序 provider 返回非 2xx 后继续 route", async () => {
 	const fixture = loadedConfig({
 		search: { providers: [] },

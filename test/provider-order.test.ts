@@ -149,6 +149,7 @@ test("默认配置缺失时创建完整配置并写入内部顺序", async (t) =
 	const parsed = JSON.parse(await readFile(path, "utf8"));
 	assert.deepEqual(parsed.search._providers, [
 		"exa",
+		"bocha",
 		"brave",
 		"searxng",
 		"anysearch",

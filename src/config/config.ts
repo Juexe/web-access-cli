@@ -19,6 +19,7 @@ export const CONFIG_ENV = "WEB_ACCESS_CONFIG";
 export const DEFAULT_SEARCH_PROVIDERS = [
 	"tavily",
 	"exa",
+	"bocha",
 	"brave",
 	"searxng",
 	"anysearch",
@@ -54,6 +55,7 @@ const DEFAULT_EXTRACT_CONFIG: ExtractConfig = {
 const SEARCH_TYPES = new Set<ProviderType>([
 	"tavily",
 	"exa",
+	"bocha",
 	"brave",
 	"searxng",
 	"anysearch",
@@ -72,6 +74,7 @@ const EXTRACT_TYPES = new Set<ProviderType>([
 const DEFAULT_INSTANCE_CONFIGS: ProviderInstanceConfig[] = [
 	{ id: "tavily", type: "tavily" },
 	{ id: "exa", type: "exa" },
+	{ id: "bocha", type: "bocha" },
 	{ id: "brave", type: "brave" },
 	{ id: "searxng", type: "searxng" },
 	{ id: "firecrawl", type: "firecrawl" },
@@ -85,6 +88,7 @@ const DEFAULT_INSTANCE_CONFIGS: ProviderInstanceConfig[] = [
 const STANDARD_KEY_ENV: Partial<Record<ProviderType, string>> = {
 	tavily: "TAVILY_API_KEY",
 	exa: "EXA_API_KEY",
+	bocha: "BOCHA_API_KEY",
 	brave: "BRAVE_API_KEY",
 	firecrawl: "FIRECRAWL_API_KEY",
 	jina: "JINA_API_KEY",
@@ -96,6 +100,7 @@ const STANDARD_KEY_ENV: Partial<Record<ProviderType, string>> = {
 const STANDARD_BASE_ENV: Partial<Record<ProviderType, string>> = {
 	tavily: "TAVILY_BASE_URL",
 	exa: "EXA_BASE_URL",
+	bocha: "BOCHA_BASE_URL",
 	brave: "BRAVE_BASE_URL",
 	searxng: "SEARXNG_BASE_URL",
 	firecrawl: "FIRECRAWL_BASE_URL",
@@ -509,7 +514,10 @@ function resolveProvider(
 			? keyEnv.source
 			: "config"
 		: "missing";
-	const standardBaseEnv = STANDARD_BASE_ENV[instance.type];
+	const standardBaseEnv =
+		instance.id === instance.type
+			? STANDARD_BASE_ENV[instance.type]
+			: undefined;
 	const baseEnv = resolveEnvValue(
 		instance.baseUrlEnv,
 		instance.id === instance.type ? standardBaseEnv : undefined,
@@ -554,6 +562,7 @@ function resolveProvider(
 const DEFAULT_BASE_URLS: Partial<Record<ProviderType, string>> = {
 	tavily: "https://api.tavily.com",
 	exa: "https://api.exa.ai",
+	bocha: "https://api.bocha.cn",
 	brave: "https://api.search.brave.com",
 	firecrawl: "https://api.firecrawl.dev",
 	jina: "https://r.jina.ai",

@@ -179,6 +179,120 @@ test("四个 search adapter 映射为统一 Search Hit", async (t) => {
 	}
 });
 
+test("Bocha Web Search 使用固定协议、过滤域名并优先 summary", async () => {
+	const transport = new MockTransport((url, options) => {
+		assert.equal(url, "https://bocha.test/v1/web-search");
+		assert.equal(options.method, "POST");
+		assert.equal(options.headers?.Authorization, "Bearer test-key");
+		assert.equal(options.headers?.["Content-Type"], "application/json");
+		assert.equal(options.headers?.Accept, "application/json");
+		assert.equal(options.headers?.authorization, undefined);
+		assert.equal(options.headers?.["X-Team"], "search");
+		assert.deepEqual(JSON.parse(options.body ?? ""), {
+			query: "agent neutral web cli site:example.com -site:blocked.example.com",
+			count: 2,
+			summary: true,
+			freshness: "oneMonth",
+		});
+		return response({
+			code: 200,
+			data: {
+				webPages: {
+					value: [
+						{
+							name: "A",
+							url: "https://example.com/a#fragment",
+							summary: "summary text",
+							snippet: "snippet text",
+						},
+						{
+							name: "blocked",
+							url: "https://blocked.example.com/b",
+							snippet: "blocked",
+						},
+						{
+							name: "B",
+							url: "https://example.com/b",
+							summary: "   ",
+							snippet: "fallback snippet",
+						},
+					],
+				},
+			},
+			log_id: "log-1",
+		});
+	});
+	const adapter = getAdapter("bocha", "search");
+	assert.ok(adapter?.search);
+	const request = searchRequest("bocha", transport);
+	request.instance.headers = {
+		"X-Team": "search",
+		authorization: "Bearer untrusted",
+		"Content-Type": "text/plain",
+		Accept: "text/plain",
+	};
+	const result = await adapter.search(request);
+	assert.deepEqual(result.data.results, [
+		{
+			rank: 1,
+			title: "A",
+			url: "https://example.com/a",
+			snippet: "summary text",
+		},
+		{
+			rank: 2,
+			title: "B",
+			url: "https://example.com/b",
+			snippet: "fallback snippet",
+		},
+	]);
+});
+
+test("Bocha 缺省 freshness、空结果、业务码和 HTTP 403 映射稳定", async (t) => {
+	await t.test("noLimit and empty", async () => {
+		const transport = new MockTransport((_url, options) => {
+			assert.equal(JSON.parse(options.body ?? "").freshness, "noLimit");
+			return response({ data: {} });
+		});
+		const adapter = getAdapter("bocha", "search");
+		assert.ok(adapter?.search);
+		const request = searchRequest("bocha", transport);
+		request.freshness = undefined;
+		assert.deepEqual((await adapter.search(request)).data.results, []);
+	});
+	await t.test("business error redacts key", async () => {
+		const transport = new MockTransport(() =>
+			response({ code: 429, msg: "bad test-key", log_id: "log-2" }),
+		);
+		const adapter = getAdapter("bocha", "search");
+		assert.ok(adapter?.search);
+		await assert.rejects(
+			adapter.search(searchRequest("bocha", transport)),
+			(error: unknown) =>
+				error instanceof WebAccessError &&
+				error.code === "rate_limited" &&
+				error.retryable &&
+				!error.message.includes("test-key") &&
+				!JSON.stringify(error.raw).includes("test-key"),
+		);
+	});
+	await t.test("HTTP 403", async () => {
+		const transport = new MockTransport(() =>
+			response({ msg: "denied test-key", log_id: "log-3" }, { status: 403 }),
+		);
+		const adapter = getAdapter("bocha", "search");
+		assert.ok(adapter?.search);
+		await assert.rejects(
+			adapter.search(searchRequest("bocha", transport)),
+			(error: unknown) =>
+				error instanceof WebAccessError &&
+				error.code === "quota_exceeded" &&
+				error.httpStatus === 403 &&
+				!error.retryable,
+		);
+	});
+});
+
 test("DeepSeek 使用固定 Messages 协议并只映射结构化搜索结果", async () => {
 	const transport = new MockTransport((url, options) => {
 		assert.equal(url, "https://deepseek.test/messages");

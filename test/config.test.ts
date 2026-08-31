@@ -198,6 +198,86 @@ test("DeepSeek 默认 endpoint 固定且缺少 key 时 doctor 失败", () => {
 	}
 });
 
+test("Bocha 使用标准环境变量、默认 endpoint 和 Search-only capability", () => {
+	const fixture = configFile({
+		providers: [
+			{
+				id: "bocha",
+				type: "bocha",
+				apiKey: "config-key",
+				headers: { "X-Team": "search" },
+			},
+		],
+		search: { providers: ["bocha"] },
+		extract: { providers: ["http"] },
+	});
+	try {
+		const loaded = loadConfig(fixture.path, {
+			BOCHA_API_KEY: "env-key",
+			BOCHA_BASE_URL: "https://bocha.internal/root/",
+		});
+		const bocha = loaded.instances.find((item) => item.id === "bocha");
+		assert.equal(bocha?.apiKey, "env-key");
+		assert.equal(bocha?.credentialSource, "standard_env");
+		assert.equal(bocha?.baseUrl, "https://bocha.internal/root");
+		assert.equal(bocha?.baseUrlSource, "standard_env");
+		assert.equal(bocha?.headers["X-Team"], "search");
+		assert.equal(capabilitySupports("bocha", "search"), true);
+		assert.equal(capabilitySupports("bocha", "extract"), false);
+		const provider = (
+			executeProviders(loaded).data as {
+				providers: Array<Record<string, unknown>>;
+			}
+		).providers.find((item) => item.id === "bocha");
+		assert.deepEqual(provider?.capabilities, ["search"]);
+		assert.deepEqual(provider?.routes, { search: true, extract: false });
+		assert.equal(executeDoctor(loaded).ok, true);
+	} finally {
+		fixture.cleanup();
+	}
+});
+
+test("Bocha 自定义 instance 只读取自定义变量且缺少 key 时 doctor 失败", () => {
+	const fixture = configFile({
+		providers: [
+			{
+				id: "bocha_team",
+				type: "bocha",
+				apiKeyEnv: "TEAM_BOCHA_KEY",
+				baseUrlEnv: "TEAM_BOCHA_URL",
+			},
+		],
+		search: { providers: ["bocha_team"] },
+		extract: { providers: ["http"] },
+	});
+	try {
+		const missing = loadConfig(fixture.path, {
+			BOCHA_API_KEY: "standard-key",
+			BOCHA_BASE_URL: "https://ignored.example.com",
+		});
+		const unconfigured = missing.instances.find(
+			(item) => item.id === "bocha_team",
+		);
+		assert.equal(unconfigured?.apiKey, null);
+		assert.equal(unconfigured?.baseUrl, "https://api.bocha.cn");
+		assert.equal(executeDoctor(missing).ok, false);
+
+		const configured = loadConfig(fixture.path, {
+			BOCHA_API_KEY: "standard-key",
+			BOCHA_BASE_URL: "https://ignored.example.com",
+			TEAM_BOCHA_KEY: "team-key",
+			TEAM_BOCHA_URL: "https://team.bocha.test/",
+		});
+		const bocha = configured.instances.find((item) => item.id === "bocha_team");
+		assert.equal(bocha?.apiKey, "team-key");
+		assert.equal(bocha?.credentialSource, "custom_env");
+		assert.equal(bocha?.baseUrl, "https://team.bocha.test");
+		assert.equal(bocha?.baseUrlSource, "custom_env");
+	} finally {
+		fixture.cleanup();
+	}
+});
+
 test("不支持过滤策略的 instance 拒绝 searchFilterMode", () => {
 	const fixture = configFile({
 		providers: [{ id: "http", type: "http", searchFilterMode: "strict" }],
@@ -225,6 +305,15 @@ test("DeepSeek 不能进入 Extract route 或配置 searchFilterMode", () => {
 	}
 });
 
+test("Bocha 不能进入 Extract route", () => {
+	const fixture = configFile({ extract: { providers: ["bocha"] } });
+	try {
+		assert.throws(() => loadConfig(fixture.path, {}), isConfigError);
+	} finally {
+		fixture.cleanup();
+	}
+});
+
 test("providers 省略或为空时合并全部内置 instance，自定义 id 只追加配置", () => {
 	const omitted = configFile({});
 	const empty = configFile({ providers: [] });
@@ -232,6 +321,7 @@ test("providers 省略或为空时合并全部内置 instance，自定义 id 只
 	const builtinIds = [
 		"tavily",
 		"exa",
+		"bocha",
 		"brave",
 		"searxng",
 		"firecrawl",
