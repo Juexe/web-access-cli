@@ -105,6 +105,40 @@ async function extractServerUrl(t: TestContext): Promise<string> {
 	return `http://127.0.0.1:${address.port}`;
 }
 
+async function anySearchExtractServerUrl(t: TestContext): Promise<string> {
+	const server = createServer((request, response) => {
+		if (request.url !== "/v1/extract") {
+			response.writeHead(404).end();
+			return;
+		}
+		response.writeHead(200, {
+			"Content-Type": "application/json; charset=utf-8",
+		});
+		response.end(
+			JSON.stringify({
+				code: 0,
+				message: "success",
+				data: {
+					url: "https://example.com/anysearch-final",
+					title: "AnySearch title",
+					content: "# AnySearch Markdown\n\n正文来自 content 字段。",
+				},
+			}),
+		);
+	});
+	await new Promise<void>((resolveListen) =>
+		server.listen(0, "127.0.0.1", resolveListen),
+	);
+	t.after(
+		() =>
+			new Promise<void>((resolveClose) => server.close(() => resolveClose())),
+	);
+	const address = server.address();
+	if (!address || typeof address === "string")
+		throw new Error("AnySearch 测试服务器未监听 TCP 端口");
+	return `http://127.0.0.1:${address.port}`;
+}
+
 test("HTTP transport 跟随重定向并执行响应大小硬上限", async (t) => {
 	const baseUrl = await serverUrl(t);
 	const previousNoProxy = process.env.NO_PROXY;
@@ -427,6 +461,36 @@ test("CLI extract 默认输出 Markdown，结构化选项输出 JSON", async (t)
 		true,
 	);
 	assert.equal(failure.stdout.trimStart().startsWith("---"), false);
+});
+
+test("CLI extract AnySearch 只输出 data.content 中的 Markdown", async (t) => {
+	const baseUrl = await anySearchExtractServerUrl(t);
+	const directory = mkdtempSync(
+		join(tmpdir(), "web-access-cli-anysearch-extract-"),
+	);
+	t.after(() => rmSync(directory, { recursive: true, force: true }));
+	const path = join(directory, "config.json");
+	writeFileSync(
+		path,
+		JSON.stringify({
+			providers: [
+				{ id: "anysearch_local", type: "anysearch", baseUrl: baseUrl },
+			],
+			extract: { providers: ["anysearch_local"], minContentCharacters: 1 },
+		}),
+		"utf8",
+	);
+	const result = await runCli(
+		["--config", path, "extract", "https://example.com/article"],
+		{ ...process.env, NO_PROXY: "127.0.0.1,localhost", WEB_ACCESS_CONFIG: "" },
+	);
+	assert.equal(result.status, 0);
+	assert.equal(result.stderr, "");
+	assert.match(result.stdout, /provider: "anysearch_local"/);
+	assert.match(result.stdout, /# AnySearch Markdown/);
+	assert.match(result.stdout, /正文来自 content 字段/);
+	assert.equal(result.stdout.includes('"code":0'), false);
+	assert.equal(result.stdout.includes('"data"'), false);
 });
 
 test("CLI 输入错误保持单 JSON、空 stderr 与退出码契约", async (t) => {

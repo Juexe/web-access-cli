@@ -528,34 +528,53 @@ test("AnySearch strict freshness 不发请求，best_effort 改写日期查询",
 	);
 });
 
-test("AnySearch Extract 使用固定 JSON-RPC tools/call 并合并 text blocks", async () => {
+test("AnySearch Extract 读取 REST data.content 为 Markdown 正文", async () => {
 	const transport = new MockTransport((url, options) => {
-		assert.equal(url, "https://anysearch.test/mcp");
+		assert.equal(url, "https://anysearch.test/v1/extract");
+		assert.equal(options.method, "POST");
 		assert.deepEqual(JSON.parse(options.body ?? ""), {
-			jsonrpc: "2.0",
-			id: 1,
-			method: "tools/call",
-			params: {
-				name: "extract",
-				arguments: { url: "https://example.com/article" },
-			},
+			url: "https://example.com/article",
 		});
 		return response({
-			jsonrpc: "2.0",
-			id: 1,
-			result: {
-				content: [
-					{ type: "text", text: "# 标题" },
-					{ type: "text", text: "正文内容" },
-				],
+			code: 0,
+			message: "success",
+			data: {
+				url: "https://example.com/final",
+				title: "AnySearch 标题",
+				content: "# 正文标题\n\n正文内容",
 			},
 		});
 	});
 	const adapter = getAdapter("anysearch", "extract");
 	assert.ok(adapter?.extract);
 	const result = await adapter.extract(extractRequest("anysearch", transport));
-	assert.equal(result.data.document.title, "标题");
-	assert.equal(result.data.document.content, "# 标题\n\n正文内容");
+	assert.deepEqual(result.data.document, {
+		sourceUrl: "https://example.com/final",
+		title: "AnySearch 标题",
+		content: "# 正文标题\n\n正文内容",
+		contentType: "text/markdown",
+	});
+});
+
+test("AnySearch Extract 不把响应 JSON 序列化为正文", async () => {
+	const transport = new MockTransport(() =>
+		response({
+			code: 0,
+			data: {
+				url: "https://example.com/article",
+				content: { markdown: "# 标题" },
+			},
+		}),
+	);
+	const adapter = getAdapter("anysearch", "extract");
+	assert.ok(adapter?.extract);
+	await assert.rejects(
+		adapter.extract(extractRequest("anysearch", transport)),
+		(error: unknown) =>
+			error instanceof Error &&
+			"code" in error &&
+			error.code === "no_usable_content",
+	);
 });
 
 test("XCrawl Search 使用固定 REST 协议并规范化嵌套结果", async () => {

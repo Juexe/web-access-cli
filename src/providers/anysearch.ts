@@ -242,68 +242,45 @@ const anysearch: ProviderAdapter = {
 		if (request.instance.apiKey)
 			headers.Authorization = `Bearer ${request.instance.apiKey}`;
 		const response = await request.transport.request(
-			buildEndpoint(requireBaseUrl(request.instance), "mcp"),
+			buildEndpoint(requireBaseUrl(request.instance), "v1/extract"),
 			{
 				method: "POST",
 				headers,
-				body: requestBody({
-					jsonrpc: "2.0",
-					id: 1,
-					method: "tools/call",
-					params: { name: "extract", arguments: { url: request.url } },
-				}),
+				body: requestBody({ url: request.url }),
 				signal: request.signal,
 				maxResponseBytes: request.maxResponseBytes,
 			},
 		);
 		assertHttp(response, request);
 		const parsed = parseJsonResponse(response, request.instance);
-		if (parsed.jsonrpc !== "2.0" || parsed.id !== 1)
+		if (parsed.code !== 0) businessFailure(parsed, request);
+		const data = parsed.data;
+		if (!data || typeof data !== "object" || Array.isArray(data))
 			throw new WebAccessError(
 				"invalid_response",
-				"AnySearch JSON-RPC 响应格式无效",
+				"AnySearch Extract 返回缺少 data",
 				{ provider: ref(request.instance), retryable: true, raw: parsed },
 			);
-		if (parsed.error !== undefined) businessFailure(parsed, request);
-		const result = parsed.result;
-		if (!result || typeof result !== "object" || Array.isArray(result))
-			throw new WebAccessError(
-				"invalid_response",
-				"AnySearch JSON-RPC 缺少 result",
-				{ provider: ref(request.instance), retryable: true, raw: parsed },
-			);
-		const resultRecord = result as Record<string, unknown>;
-		if (resultRecord.isError === true)
-			throw new WebAccessError(
-				"provider_error",
-				`AnySearch extract 工具错误: ${upstreamMessage(resultRecord)}`,
-				{ provider: ref(request.instance), retryable: true, raw: parsed },
-			);
-		if (!Array.isArray(resultRecord.content))
-			throw new WebAccessError(
-				"invalid_response",
-				"AnySearch JSON-RPC 缺少 content",
-				{ provider: ref(request.instance), retryable: true, raw: parsed },
-			);
-		const content = resultRecord.content
-			.filter(
-				(block): block is Record<string, unknown> =>
-					!!block && typeof block === "object" && !Array.isArray(block),
-			)
-			.map((block) => (typeof block.text === "string" ? block.text.trim() : ""))
-			.filter(Boolean)
-			.join("\n\n");
+		const dataRecord = data as Record<string, unknown>;
+		const content =
+			typeof dataRecord.content === "string" ? dataRecord.content.trim() : "";
 		if (!content)
 			throw new WebAccessError(
 				"no_usable_content",
-				"AnySearch extract 没有返回正文",
+				"AnySearch Extract 没有返回 Markdown 正文",
 				{ provider: ref(request.instance), retryable: true, raw: parsed },
 			);
-		const title = /^#\s+(.+)$/m.exec(content)?.[1]?.trim() ?? "";
+		const title =
+			(typeof dataRecord.title === "string" ? dataRecord.title.trim() : "") ||
+			(/^#\s+(.+)$/m.exec(content)?.[1]?.trim() ?? "");
+		const sourceUrl =
+			typeof dataRecord.url === "string" && dataRecord.url.trim()
+				? dataRecord.url.trim()
+				: request.url;
 		return {
 			data: {
 				document: {
-					sourceUrl: request.url,
+					sourceUrl,
 					title,
 					content,
 					contentType: "text/markdown",
