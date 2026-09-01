@@ -115,7 +115,7 @@ The complete JSON Schema is available at [schemas/config.schema.json](schemas/co
 
 ```json
 {
-  "$schema": "https://unpkg.com/web-access-cli@0.2.0/schemas/config.schema.json",
+  "$schema": "https://unpkg.com/web-access-cli@0.3.0/schemas/config.schema.json",
   "providers": [
     {
       "id": "exa_team",

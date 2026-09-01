@@ -88,12 +88,12 @@ jobs:
       - name: 验证 npm 注册表
         shell: bash
         run: |
-          for _ in {1..12}; do
+          for _ in {1..60}; do
             actual="$(npm view '${{ steps.release.outputs.package_name }}@${{ steps.release.outputs.version }}' version --json 2>/dev/null | tr -d '"' || true)"
             if [ "$actual" = "${{ steps.release.outputs.version }}" ]; then
               exit 0
             fi
             sleep 10
           done
-          echo "npm 注册表未在预期时间内返回已发布版本；重试工作流前必须先人工核验" >&2
+          echo "npm 注册表未在 10 分钟内返回已发布版本；重试工作流前必须先人工核验" >&2
           exit 1
