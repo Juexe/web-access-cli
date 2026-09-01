@@ -82,6 +82,7 @@ web-access search "browser automation" --include-domain example.com --exclude-do
 
 web-access extract https://example.com/article
 web-access extract https://example.com/article --provider http --timeout 30000
+web-access extract https://example.com/article --json
 
 web-access providers --pretty
 web-access doctor --pretty
@@ -98,7 +99,7 @@ The CLI provides the `search` and `extract` capability commands, the `providers`
 - `--pretty`: Pretty-print JSON. By default, JSON is written on a single line.
 - `--help`, `--version`: Print standard CLI help or version text.
 
-Except for help and version output, stdout always contains exactly one JSON envelope. Diagnostic messages are never mixed into stdout.
+Extract succeeds with Markdown by default. Its YAML front matter contains only the final Instance ID (`provider`), the returned document URL (`url`), and a non-empty trimmed title (`title`). Add `extract --json` when a schema v2 envelope is required; `--pretty` and `--debug` also select JSON. Extract failures, including `partial` results, always remain JSON envelopes. Search, diagnostics, and `config edit` continue to output JSON. Diagnostic messages are never mixed into stdout.
 
 ## Configuration
 
@@ -224,6 +225,20 @@ Capability commands use output schema version 2. Their default envelope is inten
 ```
 
 Default capability output contains only `schemaVersion`, `ok`, the final Instance ID and normalized `data`. Failures contain a compact `error` and, when providers were attempted, `attempts` entries with only Instance ID, error code and optional HTTP status. Extract quality failures may include a `partial` document without raw provider data. If the learned order cannot be written, either a success or failure envelope additionally contains `warnings: [{ "code": "provider_order_update_failed", "message": "..." }]` without replacing the primary result. Search and extract input errors use the same compact failure shape.
+
+For human-readable extraction, the default Markdown output starts with YAML front matter and then the provider-normalized Markdown body. Metadata values use JSON double-quoted scalar encoding and the body is not modified. Existing scripts and other machine consumers should append `--json` explicitly.
+
+Example default extract output:
+
+```markdown
+---
+provider: "local_http"
+url: "https://example.com/article"
+title: "Example title"
+---
+
+# Article content
+```
 
 Use `--debug` on `search` or `extract` only for protocol troubleshooting. It adds a nested `debug` object containing the request, durations, complete attempts and the final or best-failure raw response. Raw data remains recursively redacted and is not part of normal Agent calls. `providers`, `doctor`, and `config edit` retain their detailed diagnostic envelopes; all envelopes use schema version 2. Stable schemas are available in [schemas](schemas).
 

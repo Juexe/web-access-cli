@@ -7,6 +7,7 @@ import {
 	InvalidArgumentError,
 	Option,
 } from "commander";
+import { type CliOutputMode, formatExtractMarkdown } from "./cli-output.ts";
 import { loadConfig } from "./config/config.ts";
 import { executeConfigEdit } from "./config/edit.ts";
 import { createProviderOrderWriter } from "./config/provider-order.ts";
@@ -16,6 +17,7 @@ import { errorEnvelope, executeExtract, executeSearch } from "./core/router.ts";
 import type {
 	Command as EnvelopeCommand,
 	ExtractRequest,
+	ExtractSuccessEnvelope,
 	OutputEnvelope,
 	SearchFreshness,
 	SearchRequest,
@@ -77,8 +79,47 @@ function writeEnvelope(envelope: OutputEnvelope, pretty: boolean): void {
 	);
 }
 
+function writeOutput(
+	envelope: OutputEnvelope,
+	mode: CliOutputMode,
+	pretty: boolean,
+): void {
+	if (mode === "markdown" && isExtractSuccessEnvelope(envelope)) {
+		process.stdout.write(formatExtractMarkdown(envelope));
+		return;
+	}
+	writeEnvelope(envelope, pretty);
+}
+
+function isExtractSuccessEnvelope(
+	envelope: OutputEnvelope,
+): envelope is ExtractSuccessEnvelope {
+	return (
+		envelope.ok &&
+		"provider" in envelope &&
+		typeof envelope.provider === "string" &&
+		"data" in envelope &&
+		typeof envelope.data === "object" &&
+		envelope.data !== null &&
+		"document" in envelope.data &&
+		typeof envelope.data.document === "object" &&
+		envelope.data.document !== null &&
+		"sourceUrl" in envelope.data.document &&
+		typeof envelope.data.document.sourceUrl === "string" &&
+		"title" in envelope.data.document &&
+		typeof envelope.data.document.title === "string" &&
+		"content" in envelope.data.document &&
+		typeof envelope.data.document.content === "string" &&
+		"contentType" in envelope.data.document &&
+		envelope.data.document.contentType === "text/markdown"
+	);
+}
+
 export function createProgram(
-	run: (task: () => Promise<OutputEnvelope> | OutputEnvelope) => void,
+	run: (
+		task: () => Promise<OutputEnvelope> | OutputEnvelope,
+		mode?: CliOutputMode,
+	) => void,
 	dependencies: CliDependencies = {},
 ): Command {
 	const program = new Command();
@@ -88,7 +129,7 @@ export function createProgram(
 		.description("Agent-neutral 的网页搜索与内容提取 CLI")
 		.version(VERSION)
 		.option("--config <path>", "指定 JSON 配置文件")
-		.option("--pretty", "格式化 JSON 输出", false)
+		.option("--pretty", "格式化 JSON 输出；extract 同时选择 JSON 模式", false)
 		.showSuggestionAfterError();
 	program.configureOutput({ writeErr: () => {}, outputError: () => {} });
 	program.exitOverride();
@@ -151,18 +192,28 @@ export function createProgram(
 
 	program
 		.command("extract")
-		.description("提取网页正文并转换为 Markdown")
+		.description(
+			"提取网页正文并转换为 Markdown（--json/--pretty/--debug 输出 JSON）",
+		)
 		.argument("<url>", "HTTP(S) URL")
 		.option("-p, --provider <id>", "provider instance id，或 auto", "auto")
 		.option("--timeout <milliseconds>", "总超时毫秒数", integer)
+		.option("--json", "输出 JSON envelope", false)
 		.option("--debug", "输出完整路由和脱敏原始响应", false)
 		.action(
 			(
 				url: string,
-				options: { provider: string; timeout?: number; debug: boolean },
+				options: {
+					provider: string;
+					timeout?: number;
+					json: boolean;
+					debug: boolean;
+				},
 			) => {
+				const globals = program.opts<GlobalOptions>();
+				const outputMode: CliOutputMode =
+					options.json || options.debug || globals.pretty ? "json" : "markdown";
 				run(async () => {
-					const globals = program.opts<GlobalOptions>();
 					const loaded = loadConfig(globals.config);
 					const request: ExtractRequest = {
 						url: httpUrl(url),
@@ -175,7 +226,7 @@ export function createProgram(
 						debug: options.debug,
 						persistProviderOrder: createProviderOrderWriter(loaded),
 					});
-				});
+				}, outputMode);
 			},
 		);
 
@@ -227,7 +278,9 @@ process.once("SIGINT", () => processSignal.abort());
 
 async function main(): Promise<void> {
 	let pending: Promise<OutputEnvelope> | undefined;
-	const program = createProgram((task) => {
+	let pendingOutputMode: CliOutputMode = "json";
+	const program = createProgram((task, mode = "json") => {
+		pendingOutputMode = mode;
 		pending = Promise.resolve().then(task);
 	});
 	if (process.argv.length <= 2) {
@@ -242,7 +295,11 @@ async function main(): Promise<void> {
 		await program.parseAsync(process.argv);
 		if (!pending) throw new WebAccessError("invalid_input", "必须指定命令");
 		const envelope = await pending;
-		writeEnvelope(envelope, !!program.opts<GlobalOptions>().pretty);
+		writeOutput(
+			envelope,
+			pendingOutputMode,
+			!!program.opts<GlobalOptions>().pretty,
+		);
 		process.exitCode = exitCode(envelope);
 	} catch (caught) {
 		if (

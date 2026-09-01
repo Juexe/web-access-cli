@@ -82,6 +82,7 @@ web-access search "browser automation" --include-domain example.com --exclude-do
 
 web-access extract https://example.com/article
 web-access extract https://example.com/article --provider http --timeout 30000
+web-access extract https://example.com/article --json
 
 web-access providers --pretty
 web-access doctor --pretty
@@ -98,7 +99,7 @@ CLI 提供 `search`、`extract` 两个能力命令，`providers`、`doctor` 两�
 - `--pretty`：格式化 JSON；默认输出单行 JSON。
 - `--help`、`--version`：输出常规 CLI 帮助或版本文本。
 
-除帮助与版本外，命令的 stdout 始终只有一个 JSON envelope。诊断信息不会混入 stdout。
+`extract` 成功时默认输出 Markdown，文首 YAML front matter 只包含最终 Instance ID（`provider`）、Provider 返回的文档 URL（`url`）和非空的去除首尾空白标题（`title`）。需要 schema v2 envelope 时显式追加 `extract --json`；`--pretty` 和 `--debug` 也会选择 JSON。提取失败（包括 `partial`）始终输出 JSON envelope。`search`、诊断命令和 `config edit` 继续输出 JSON。诊断信息不会混入 stdout。
 
 ## 配置
 
@@ -224,6 +225,20 @@ Attempt 会保留 Provider 的原始错误码、HTTP status 和 `retryable` 值�
 ```
 
 能力命令成功时默认只有 `schemaVersion`、`ok`、最终 Instance ID 和规范化 `data`。失败时包含精简 `error`；实际尝试过 Provider 时，`attempts` 只保留 Instance ID、错误码和可选 HTTP status。提取质量失败可包含不含 raw 的 `partial` 文档。排序无法写回时，成功或失败 envelope 会额外包含 `warnings: [{ "code": "provider_order_update_failed", "message": "..." }]`，但不会覆盖主要结果。搜索和提取输入错误也使用相同的精简失败结构。
+
+面向人的提取默认输出以 YAML front matter 开头、随后是 Provider 规范化的 Markdown 正文。元数据值统一使用 JSON 双引号标量编码，正文内容不改写。已有脚本和其他机器消费者应显式追加 `--json`。
+
+默认提取输出示例：
+
+```markdown
+---
+provider: "local_http"
+url: "https://example.com/article"
+title: "Example title"
+---
+
+# Article content
+```
 
 只有协议排障时才在 `search` 或 `extract` 上使用 `--debug`。该选项会增加嵌套 `debug`，其中包含 request、耗时、完整 attempts 以及最终成功或最佳失败的 raw 响应；raw 仍会递归脱敏，常规 Agent 调用不应使用此选项。`providers`、`doctor` 和 `config edit` 保留详细诊断 envelope；所有 envelope 使用 schema version 2。稳定 schema 位于 [schemas](schemas)。
 

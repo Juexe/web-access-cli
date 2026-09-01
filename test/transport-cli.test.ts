@@ -75,6 +75,36 @@ async function serverUrl(t: TestContext): Promise<string> {
 	return `http://127.0.0.1:${address.port}`;
 }
 
+async function extractServerUrl(t: TestContext): Promise<string> {
+	const server = createServer((request, response) => {
+		if (request.url === "/fail") {
+			response.writeHead(500, { "Content-Type": "text/plain" });
+			response.end("temporary failure");
+			return;
+		}
+		if (request.url !== "/article") {
+			response.writeHead(404).end();
+			return;
+		}
+		response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+		response.end(
+			'<!doctype html><html><head><title>Example "title"</title></head>' +
+				"<body><main><h1>Article content</h1><p>Enough content for extraction.</p></main></body></html>",
+		);
+	});
+	await new Promise<void>((resolveListen) =>
+		server.listen(0, "127.0.0.1", resolveListen),
+	);
+	t.after(
+		() =>
+			new Promise<void>((resolveClose) => server.close(() => resolveClose())),
+	);
+	const address = server.address();
+	if (!address || typeof address === "string")
+		throw new Error("提取测试服务器未监听 TCP 端口");
+	return `http://127.0.0.1:${address.port}`;
+}
+
 test("HTTP transport 跟随重定向并执行响应大小硬上限", async (t) => {
 	const baseUrl = await serverUrl(t);
 	const previousNoProxy = process.env.NO_PROXY;
@@ -339,6 +369,64 @@ test("CLI 将成功 provider 写到队头并在下一进程优先使用", async 
 	assert.equal(second.stderr, "");
 	assert.equal(JSON.parse(second.stdout).provider, "search_b");
 	assert.deepEqual(requests, { a: 1, b: 2 });
+});
+
+test("CLI extract 默认输出 Markdown，结构化选项输出 JSON", async (t) => {
+	const baseUrl = await extractServerUrl(t);
+	const directory = mkdtempSync(
+		join(tmpdir(), "web-access-cli-extract-output-"),
+	);
+	t.after(() => rmSync(directory, { recursive: true, force: true }));
+	const path = join(directory, "config.json");
+	writeFileSync(
+		path,
+		JSON.stringify({
+			providers: [{ id: "local_http", type: "http" }],
+			extract: { providers: ["local_http"], minContentCharacters: 1 },
+		}),
+		"utf8",
+	);
+	const env = {
+		...process.env,
+		NO_PROXY: "127.0.0.1,localhost",
+		WEB_ACCESS_CONFIG: "",
+	};
+	const args = ["--config", path, "extract", `${baseUrl}/article`];
+
+	const markdown = await runCli(args, env);
+	assert.equal(markdown.status, 0);
+	assert.equal(markdown.stderr, "");
+	assert.match(
+		markdown.stdout,
+		/^---\nprovider: "local_http"\nurl: ".*\/article"\ntitle: "Example \\"title\\""\n---\n\n/,
+	);
+	assert.match(markdown.stdout, /Article content/);
+	assert.equal(markdown.stdout.trimStart().startsWith("{"), false);
+
+	for (const option of ["--json", "--pretty", "--debug"]) {
+		const result = await runCli([...args, option], env);
+		assert.equal(result.status, 0, option);
+		assert.equal(result.stderr, "", option);
+		const envelope = JSON.parse(result.stdout) as Record<string, unknown>;
+		assert.equal(envelope.schemaVersion, 2, option);
+		assert.equal(envelope.ok, true, option);
+		assert.equal(envelope.provider, "local_http", option);
+		assert.equal(result.stdout.trimStart().startsWith("---"), false, option);
+		if (option === "--pretty")
+			assert.match(result.stdout, /\n {2}"schemaVersion": 2,/);
+		if (option === "--debug") assert.equal("debug" in envelope, true);
+	}
+
+	const failure = await runCli([...args.slice(0, -1), `${baseUrl}/fail`], env);
+	assert.equal(failure.status, 1);
+	assert.equal(failure.stderr, "");
+	const failureEnvelope = JSON.parse(failure.stdout) as Record<string, unknown>;
+	assert.equal(failureEnvelope.ok, false);
+	assert.equal(
+		failureEnvelope.error && typeof failureEnvelope.error === "object",
+		true,
+	);
+	assert.equal(failure.stdout.trimStart().startsWith("---"), false);
 });
 
 test("CLI 输入错误保持单 JSON、空 stderr 与退出码契约", async (t) => {
