@@ -26,15 +26,20 @@ async function temporaryDirectory(t: TestContext): Promise<string> {
 	return directory;
 }
 
-test("config edit 创建完整默认配置后再调用系统打开器", async (t) => {
+test("config edit 创建完整默认配置后再调用编辑器", async (t) => {
 	const directory = await temporaryDirectory(t);
 	const path = join(directory, "nested", "config.json");
 	const ignoredEnvPath = join(directory, "ignored.json");
 	const opened: string[] = [];
 	const envelope = await executeConfigEdit({
 		explicitPath: path,
-		env: { WEB_ACCESS_CONFIG: ignoredEnvPath },
-		openPath: async (target) => {
+		env: { WEB_ACCESS_CONFIG: ignoredEnvPath, EDITOR: "test-editor" },
+		openPath: async (target, editor) => {
+			assert.deepEqual(editor, {
+				variable: "EDITOR",
+				command: "test-editor",
+				arguments: [],
+			});
 			assert.equal(typeof JSON.parse(await readFile(target, "utf8")), "object");
 			opened.push(target);
 		},
@@ -101,7 +106,7 @@ test("config edit 原样打开已有的无效 JSON 文件", async (t) => {
 
 	const envelope = await executeConfigEdit({
 		explicitPath: path,
-		env: {},
+		env: { EDITOR: "test-editor" },
 		openPath: async (target) => {
 			opened.push(target);
 		},
@@ -122,7 +127,7 @@ test("config edit 打开失败时保留刚创建的配置文件", async (t) => {
 	await assert.rejects(
 		executeConfigEdit({
 			explicitPath: path,
-			env: {},
+			env: { EDITOR: "test-editor" },
 			openPath: async () => {
 				throw openFailure;
 			},
@@ -157,13 +162,94 @@ test("config edit 拒绝把目录当作配置文件", async (t) => {
 	await assert.rejects(
 		executeConfigEdit({
 			explicitPath: path,
-			env: {},
+			env: { EDITOR: "test-editor" },
 			openPath: async () => {
 				opened = true;
 			},
 		}),
 		(error: unknown) =>
 			error instanceof WebAccessError && error.code === "config_error",
+	);
+	assert.equal(opened, false);
+});
+
+test("config edit 优先使用 VISUAL，并将参数和配置路径分开传递", async (t) => {
+	const directory = await temporaryDirectory(t);
+	const path = join(directory, "folder with spaces", "config.json");
+	let received:
+		| { path: string; command: string; arguments: string[] }
+		| undefined;
+
+	await executeConfigEdit({
+		explicitPath: path,
+		env: {
+			VISUAL: '"C:\\Program Files\\Editor\\editor.exe" --reuse-window',
+			EDITOR: "fallback-editor --should-not-run",
+		},
+		openPath: async (target, editor) => {
+			received = {
+				path: target,
+				command: editor.command,
+				arguments: editor.arguments,
+			};
+		},
+	});
+
+	assert.deepEqual(received, {
+		path,
+		command: "C:\\Program Files\\Editor\\editor.exe",
+		arguments: ["--reuse-window"],
+	});
+});
+
+test("config edit 在 VISUAL 为空时使用 EDITOR，并在缺少编辑器时失败", async (t) => {
+	const directory = await temporaryDirectory(t);
+	const fallbackPath = join(directory, "fallback.json");
+	let selected: string | undefined;
+
+	await executeConfigEdit({
+		explicitPath: fallbackPath,
+		env: { VISUAL: "  ", EDITOR: "nano --literal" },
+		openPath: async (_path, editor) => {
+			selected = `${editor.variable}:${editor.command}:${editor.arguments.join(",")}`;
+		},
+	});
+	assert.equal(selected, "EDITOR:nano:--literal");
+
+	const missingPath = join(directory, "missing.json");
+	await assert.rejects(
+		executeConfigEdit({
+			explicitPath: missingPath,
+			env: { VISUAL: "", EDITOR: " " },
+		}),
+		(error: unknown) =>
+			error instanceof WebAccessError &&
+			error.code === "open_failed" &&
+			error.details &&
+			typeof error.details === "object" &&
+			(error.details as Record<string, unknown>).created === true,
+	);
+	assert.equal(
+		(await readFile(missingPath, "utf8")).includes('"$schema"'),
+		true,
+	);
+});
+
+test("config edit 拒绝未闭合引号且不回退到 EDITOR", async (t) => {
+	const directory = await temporaryDirectory(t);
+	const path = join(directory, "invalid-editor.json");
+	let opened = false;
+
+	await assert.rejects(
+		executeConfigEdit({
+			explicitPath: path,
+			env: { VISUAL: '"broken-editor', EDITOR: "working-editor" },
+			openPath: async () => {
+				opened = true;
+			},
+		}),
+		(error: unknown) =>
+			error instanceof WebAccessError && error.code === "open_failed",
 	);
 	assert.equal(opened, false);
 });

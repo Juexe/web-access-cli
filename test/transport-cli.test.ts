@@ -609,6 +609,35 @@ test("CLI config edit 的路径错误保持单 JSON 与退出码契约", () => {
 	assert.equal(envelope.error?.code, "config_error");
 });
 
+test("CLI config edit 使用 VISUAL 启动编辑器并保持单 JSON 契约", async (t) => {
+	const directory = mkdtempSync(
+		join(tmpdir(), "web-access-config-editor-cli-"),
+	);
+	t.after(() => rmSync(directory, { recursive: true, force: true }));
+	const path = join(directory, "config.json");
+	const result = await runCli(["--config", path, "config", "edit"], {
+		...process.env,
+		VISUAL: process.execPath,
+		EDITOR: "definitely-not-used-editor",
+		WEB_ACCESS_CONFIG: "",
+	});
+
+	assert.equal(result.status, 0);
+	assert.equal(result.stderr, "");
+	const lines = result.stdout.trim().split(/\r?\n/);
+	assert.equal(lines.length, 1);
+	const envelope = JSON.parse(lines[0] ?? "{}") as {
+		schemaVersion?: number;
+		ok?: boolean;
+		command?: string;
+		data?: { path?: string; created?: boolean; opened?: boolean };
+	};
+	assert.equal(envelope.schemaVersion, 2);
+	assert.equal(envelope.ok, true);
+	assert.equal(envelope.command, "config.edit");
+	assert.deepEqual(envelope.data, { path, created: true, opened: true });
+});
+
 test("CLI 通过符号链接入口运行时仍会执行主程序", () => {
 	const directory = mkdtempSync(join(tmpdir(), "web-access-cli-link-"));
 	const repositoryLink = join(directory, "repository");

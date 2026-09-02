@@ -107,7 +107,7 @@ Configuration files use strict JSON; unknown fields are rejected. The CLI reads 
 
 The default path on every platform is `~/.config/web-access-cli/config.json`, where `~` is the current user's home directory. The `WEB_ACCESS_CONFIG` environment variable can select another path. The `--config` command-line option takes precedence.
 
-`web-access config edit` creates parent directories and a complete default configuration when the file is missing, then opens it with the operating system's default application for JSON files. An existing file is opened byte-for-byte as-is, even when it is temporarily invalid JSON; it is never overwritten or reformatted. The command waits only for the operating system to accept the open request, not for the editor to close. On success, envelope `data` contains the absolute `path`, `created`, and `opened: true`. A default-application launch failure returns `open_failed`; a configuration file that was created successfully remains available for manual editing.
+`web-access config edit` creates parent directories and a complete default configuration when the file is missing, then opens it with the command in `VISUAL`, or `EDITOR` when `VISUAL` is empty. The value may contain a quoted executable path and arguments; it is parsed without shell evaluation and the configuration path is appended as a separate argument. An existing file is opened byte-for-byte as-is, even when it is temporarily invalid JSON; it is never overwritten or reformatted. The command waits only for the editor process to start, not for it to close. When neither variable is set, the command returns `open_failed`; a configuration file that was created successfully remains available for manual editing.
 
 `config edit` itself never rewrites existing content. After an `auto` capability call succeeds or encounters fallback-eligible failures, the CLI atomically updates `search._providers` or `extract._providers`. If the default configuration does not exist, the first `auto` call that produces a learning result creates the complete default configuration. `_providers` is CLI-managed and cannot enable an instance outside `providers`. Missing, malformed, duplicate, unknown, or membership-mismatched internal entries reset the whole capability to the declared route. Delete `_providers` to restore the user-declared initial order manually.
 
@@ -246,7 +246,7 @@ Exit codes:
 
 - `0`: Success
 - `2`: Invalid input or configuration, or an unknown or disabled provider
-- `1`: Runtime, provider, doctor, or default-application launch failure
+- `1`: Runtime, provider, doctor, or editor launch failure
 - `130`: User cancellation
 
 `providers` lists each instance's type, capabilities, route status, credential source, and base URL source. Its `searchRoute` and `extractRoute` fields show the effective order for the next `auto` call. `doctor` performs local configuration checks only and does not call remote APIs. If an enabled route contains an unconfigured instance, the command returns `doctor_failed` with exit code `1`.

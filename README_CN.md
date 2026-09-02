@@ -107,7 +107,7 @@ CLI 提供 `search`、`extract` 两个能力命令，`providers`、`doctor` 两�
 
 所有平台的默认路径均为 `~/.config/web-access-cli/config.json`，其中 `~` 表示当前用户的主目录。环境变量 `WEB_ACCESS_CONFIG` 可以指定其他路径；命令行 `--config` 优先级更高。
 
-`web-access config edit` 会在配置文件缺失时创建父目录和完整默认配置，再用系统为 JSON 文件关联的默认应用打开；已有文件会原样打开，即使内容暂时不是有效 JSON 也不会被覆盖或格式化。命令只等待系统接受打开请求，不等待编辑器关闭。成功 envelope 的 `data` 包含绝对 `path`、是否新建的 `created` 和 `opened: true`。无法启动默认应用时返回 `open_failed`；如果配置刚刚创建成功，文件仍会保留以便手动打开。
+`web-access config edit` 会在配置文件缺失时创建父目录和完整默认配置，再优先使用 `VISUAL`、其次使用 `EDITOR` 打开；变量值可以包含带引号的可执行文件路径和参数，解析时不会执行 shell，并将配置路径作为独立的最后一个参数传入。已有文件会原样打开，即使内容暂时不是有效 JSON 也不会被覆盖或格式化。命令只等待编辑器进程启动，不等待编辑器关闭。两个变量都未设置、格式无效或启动失败时返回 `open_failed`；如果配置刚刚创建成功，文件仍会保留以便手动编辑。
 
 `config edit` 本身不会改写已有内容；能力命令使用 `auto` 成功或发生可回退失败后，会原子更新 `search._providers` 或 `extract._providers`。默认配置尚不存在时，首次产生学习结果的 `auto` 调用会创建完整默认配置。`_providers` 由 CLI 管理，不会启用 `providers` 之外的 Instance；其内容缺失、格式错误、重复、引用未知 ID 或与 `providers` 成员集合不一致时会整组重置。删除 `_providers` 可以手动恢复用户声明的初始顺序。
 
@@ -246,7 +246,7 @@ title: "Example title"
 
 - `0`：成功
 - `2`：输入、配置、未知或未启用 provider
-- `1`：运行时/provider/doctor/默认应用启动失败
+- `1`：运行时/provider/doctor/编辑器启动失败
 - `130`：用户取消
 
 `providers` 会列出每个 Instance 的 Type、能力、Route 启用状态、凭据来源和 base URL 来源；`searchRoute` 与 `extractRoute` 是下一次 `auto` 使用的有效顺序。`doctor` 只做本地配置检查，不主动调用远端 API；当已启用 Route 中存在未配置 Instance 时，命令返回 `doctor_failed` 和退出码 `1`。

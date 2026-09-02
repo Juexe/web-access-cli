@@ -251,7 +251,7 @@ export function createProgram(
 	const config = program.command("config").description("管理配置文件");
 	config
 		.command("edit")
-		.description("创建默认配置文件并用系统默认应用打开")
+		.description("创建默认配置文件并用 VISUAL 或 EDITOR 打开")
 		.action(() =>
 			run(() =>
 				runConfigEdit({
