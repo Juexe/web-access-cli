@@ -147,6 +147,14 @@
                     {
                       "type": "string",
                       "const": "deepseek"
+                    },
+                    {
+                      "type": "string",
+                      "const": "xai_x_search"
+                    },
+                    {
+                      "type": "string",
+                      "const": "xai_web_search"
                     }
                   ]
                 }
@@ -217,6 +225,14 @@
                           {
                             "type": "string",
                             "const": "deepseek"
+                          },
+                          {
+                            "type": "string",
+                            "const": "xai_x_search"
+                          },
+                          {
+                            "type": "string",
+                            "const": "xai_web_search"
                           }
                         ]
                       }
@@ -310,6 +326,14 @@
                               {
                                 "type": "string",
                                 "const": "deepseek"
+                              },
+                              {
+                                "type": "string",
+                                "const": "xai_x_search"
+                              },
+                              {
+                                "type": "string",
+                                "const": "xai_web_search"
                               }
                             ]
                           }
@@ -387,6 +411,14 @@
                         {
                           "type": "string",
                           "const": "deepseek"
+                        },
+                        {
+                          "type": "string",
+                          "const": "xai_x_search"
+                        },
+                        {
+                          "type": "string",
+                          "const": "xai_web_search"
                         }
                       ]
                     }
@@ -543,6 +575,14 @@
                     {
                       "type": "string",
                       "const": "deepseek"
+                    },
+                    {
+                      "type": "string",
+                      "const": "xai_x_search"
+                    },
+                    {
+                      "type": "string",
+                      "const": "xai_web_search"
                     }
                   ]
                 }
@@ -613,6 +653,14 @@
                           {
                             "type": "string",
                             "const": "deepseek"
+                          },
+                          {
+                            "type": "string",
+                            "const": "xai_x_search"
+                          },
+                          {
+                            "type": "string",
+                            "const": "xai_web_search"
                           }
                         ]
                       }
@@ -706,6 +754,14 @@
                               {
                                 "type": "string",
                                 "const": "deepseek"
+                              },
+                              {
+                                "type": "string",
+                                "const": "xai_x_search"
+                              },
+                              {
+                                "type": "string",
+                                "const": "xai_web_search"
                               }
                             ]
                           }
@@ -783,6 +839,14 @@
                         {
                           "type": "string",
                           "const": "deepseek"
+                        },
+                        {
+                          "type": "string",
+                          "const": "xai_x_search"
+                        },
+                        {
+                          "type": "string",
+                          "const": "xai_web_search"
                         }
                       ]
                     }
@@ -987,6 +1051,14 @@
                     {
                       "type": "string",
                       "const": "deepseek"
+                    },
+                    {
+                      "type": "string",
+                      "const": "xai_x_search"
+                    },
+                    {
+                      "type": "string",
+                      "const": "xai_web_search"
                     }
                   ]
                 }
@@ -1057,6 +1129,14 @@
                           {
                             "type": "string",
                             "const": "deepseek"
+                          },
+                          {
+                            "type": "string",
+                            "const": "xai_x_search"
+                          },
+                          {
+                            "type": "string",
+                            "const": "xai_web_search"
                           }
                         ]
                       }
@@ -1150,6 +1230,14 @@
                               {
                                 "type": "string",
                                 "const": "deepseek"
+                              },
+                              {
+                                "type": "string",
+                                "const": "xai_x_search"
+                              },
+                              {
+                                "type": "string",
+                                "const": "xai_web_search"
                               }
                             ]
                           }
@@ -1227,6 +1315,14 @@
                         {
                           "type": "string",
                           "const": "deepseek"
+                        },
+                        {
+                          "type": "string",
+                          "const": "xai_x_search"
+                        },
+                        {
+                          "type": "string",
+                          "const": "xai_web_search"
                         }
                       ]
                     }
@@ -1437,6 +1533,14 @@
                     {
                       "type": "string",
                       "const": "deepseek"
+                    },
+                    {
+                      "type": "string",
+                      "const": "xai_x_search"
+                    },
+                    {
+                      "type": "string",
+                      "const": "xai_web_search"
                     }
                   ]
                 }

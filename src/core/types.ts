@@ -10,6 +10,8 @@ export const PROVIDER_TYPES = [
 	"anysearch",
 	"xcrawl",
 	"deepseek",
+	"xai_x_search",
+	"xai_web_search",
 ] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
 
@@ -40,6 +42,10 @@ export interface ProviderInstanceConfig {
 	apiKeyEnv?: string;
 	baseUrl?: string;
 	baseUrlEnv?: string;
+	authJson?: string;
+	authJsonEnv?: string;
+	model?: string;
+	modelEnv?: string;
 	headers?: Record<string, string>;
 	searchFilterMode?: SearchFilterMode;
 }
@@ -76,6 +82,8 @@ export type CredentialSource =
 	| "standard_env"
 	| "custom_env"
 	| "config"
+	| "auth_json"
+	| "custom_auth_json"
 	| "missing";
 
 export interface ProviderInstance {
@@ -91,6 +99,10 @@ export interface ProviderInstance {
 		| "default"
 		| "missing";
 	headers: Record<string, string>;
+	authJson: string | null;
+	authJsonSource: "standard_env" | "custom_env" | "config" | "missing";
+	model: string | null;
+	modelSource: "standard_env" | "custom_env" | "config" | "default" | "missing";
 	searchFilterMode?: SearchFilterMode | null;
 }
 

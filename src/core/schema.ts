@@ -20,6 +20,10 @@ const SearchFilterProviderTypeSchema = Type.Union([
 	Type.Literal("anysearch"),
 	Type.Literal("xcrawl"),
 ]);
+const XaiProviderTypeSchema = Type.Union([
+	Type.Literal("xai_x_search"),
+	Type.Literal("xai_web_search"),
+]);
 export const CapabilitySchema = literalUnion(CAPABILITIES);
 export const CommandSchema = literalUnion(COMMANDS);
 export const FreshnessSchema = literalUnion(FRESHNESS_VALUES);
@@ -43,6 +47,15 @@ const ProviderInstanceFields = {
 		),
 	),
 };
+const XaiProviderFields = {
+	...ProviderInstanceFields,
+	authJson: Type.Optional(Type.String()),
+	authJsonEnv: Type.Optional(
+		Type.String({ pattern: "^[A-Za-z_][A-Za-z0-9_]*$" }),
+	),
+	model: Type.Optional(Type.String()),
+	modelEnv: Type.Optional(Type.String({ pattern: "^[A-Za-z_][A-Za-z0-9_]*$" })),
+};
 export const ProviderInstanceConfigSchema = Type.Union([
 	Type.Object(
 		{
@@ -56,6 +69,13 @@ export const ProviderInstanceConfigSchema = Type.Union([
 			...ProviderInstanceFields,
 			type: SearchFilterProviderTypeSchema,
 			searchFilterMode: Type.Optional(SearchFilterModeSchema),
+		},
+		{ additionalProperties: false },
+	),
+	Type.Object(
+		{
+			...XaiProviderFields,
+			type: XaiProviderTypeSchema,
 		},
 		{ additionalProperties: false },
 	),

@@ -32,6 +32,8 @@ web-access extract "https://example.com" --provider <id> --json
 
 `auto` 通常已经尝试可回退的 Instance，并会在 Provider 返回最终非 2xx HTTP 响应时继续 Route；成功 Instance 会成为下次同能力调用的首选，不要盲目重复请求。需要搜索过滤、数量或超时等选项时，运行 `web-access search --help` 或 `web-access extract --help`。
 
+配置了外部 xAI OAuth JSON 后，可使用 `xai_web_search`（默认 route 末尾）或显式启用 `xai_x_search`；两者读取 `XAI_AUTH_JSON`，不由 Skill 直接刷新凭据。
+
 面向人的阅读直接运行 `extract <url>`；输出前置 YAML front matter，随后是 Markdown 正文。AnySearch Extract 使用 REST 响应的 `data.content` 字段作为正文，并使用 `data.title`/`data.url` 作为可用元数据，不输出完整 JSON 响应。
 
 使用 `extract --json` 和 `search` 时，能力命令返回精简的 schema v2 envelope：成功读取 `data` 和 `provider`，失败读取 `error`，必要时读取精简 `attempts` 或 `partial`。`extract --pretty` 或 `extract --debug` 也会选择 JSON；extract 失败始终返回 JSON failure envelope。若出现 `warnings[].code == "provider_order_update_failed"`，主要结果仍有效，但下次调用可能继续使用旧顺序。不要在常规调用中使用 `--debug`；它只用于协议排障，会把 request、完整回退记录和脱敏 raw 放入嵌套 `debug` 对象。`providers`、`doctor` 和 `config edit` 仍返回详细诊断数据。`config edit` 使用非空 `VISUAL`，否则使用 `EDITOR`；值可包含带引号的命令路径和参数，不经 shell 解释，配置路径作为独立参数追加。两个变量都未设置或编辑器无法启动时返回 `open_failed`，命令只等待进程启动，不等待退出。

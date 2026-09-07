@@ -153,16 +153,18 @@ CLI 提供 `search`、`extract` 两个能力命令，`providers`、`doctor` 两�
 }
 ```
 
-内置 Instance 为 `tavily`、`exa`、`bocha`、`brave`、`searxng`、`firecrawl`、`jina`、`http`、`anysearch`、`xcrawl`、`deepseek`。配置同 ID 时会覆盖内置实例的字段；自定义 ID 可以创建同 Type 的额外实例。只有出现在对应 `providers` Route 中的实例才启用。Bocha 默认 base URL 为 `https://api.bocha.cn`，必须配置 API key；AnySearch 默认 base URL 为 `https://api.anysearch.com`，支持匿名调用；XCrawl 默认 base URL 为 `https://run.xcrawl.com`，必须配置 API key；DeepSeek 默认 base URL 为 `https://api.deepseek.com/anthropic/v1`，必须配置 API key。
+内置 Instance 为 `tavily`、`exa`、`bocha`、`brave`、`searxng`、`firecrawl`、`jina`、`http`、`anysearch`、`xcrawl`、`deepseek`、`xai_x_search`、`xai_web_search`。配置同 ID 时会覆盖内置实例的字段；自定义 ID 可以创建同 Type 的额外实例。只有出现在对应 `providers` Route 中的实例才启用。Bocha 默认 base URL 为 `https://api.bocha.cn`，必须配置 API key；AnySearch 默认 base URL 为 `https://api.anysearch.com`，支持匿名调用；XCrawl 默认 base URL 为 `https://run.xcrawl.com`，必须配置 API key；DeepSeek 默认 base URL 为 `https://api.deepseek.com/anthropic/v1`，必须配置 API key。
 
 默认 Route：
 
-- Search：`tavily -> exa -> bocha -> brave -> searxng -> anysearch -> xcrawl -> deepseek`
+- Search：`tavily -> exa -> bocha -> brave -> searxng -> anysearch -> xcrawl -> deepseek -> xai_web_search`
 - Extract：`firecrawl -> jina -> exa -> anysearch -> xcrawl -> http`
 
 默认 Route 包含支持对应 Capability 的全部内置 Instance。自定义 ID 会合并到 Instance 列表，但仍需显式加入 Route；省略 Route 时使用上述默认值，显式空数组则禁用对应能力。`auto` 会跳过未完成配置的 Instance；AnySearch 使用默认 base URL 时可匿名调用，XCrawl 和 DeepSeek 则在配置 API key 前被跳过。AnySearch 与 XCrawl 可设置 `searchFilterMode`：`strict`（默认，遇到 freshness 时跳过）或 `best_effort`（将日期改写为查询片段）。域名条件会改写查询并在本地再次严格过滤。XCrawl Extract 固定使用同步 Scrape 的 Markdown 输出；Map、Crawl 和异步任务不属于当前 CLI 能力。
 
 DeepSeek Search 通过 Anthropic-compatible Messages API 调用原生 `web_search_20250305` server tool，一次搜索是完整模型轮次，因此延迟和成本可能高于专用搜索 endpoint。它位于默认 Route 末尾，仅在前序 Provider 未配置、返回最终非 2xx HTTP 响应或发生其他可恢复失败后触发。Adapter 只接受 `web_search_tool_result` 中的结构化 URL，按 URL 合并 citation 摘要，绝不从模型 prose 中猜测 URL。域名条件会改写查询并在本地再次严格过滤；DeepSeek 不支持 `freshness`，遇到该参数时以可恢复错误跳过；重定向会被严格拒绝，且不会访问 `Location` 目标。Provider 私有的 `encrypted_content` 是 CLI 无法展示或解码的 opaque payload，不具备诊断价值，因此会从 `raw` 中移除。
+
+XAI hosted Search 使用 `XAI_AUTH_JSON` 指向外部 OAuth JSON 文件，每次调用只读取 `access_token`，由外部 CLIProxyAPI 负责刷新和回写。可用 `authJson`/`authJsonEnv` 与 `model`/`modelEnv` 为实例覆盖路径和模型。`xai_web_search` 支持最多 5 个 allow 或 exclude 域名（两者不能同时使用）；`xai_x_search` 不接受 `freshness`。模型搜索可能超过默认 20 秒单次超时，建议将 Search 的 `attemptTimeoutMs` 和 `timeoutMs` 提高到 60000/120000。
 
 ### 凭据和 URL
 
@@ -181,6 +183,7 @@ DeepSeek Search 通过 Anthropic-compatible Messages API 调用原生 `web_searc
 | AnySearch | `ANYSEARCH_API_KEY`，可选 | `ANYSEARCH_BASE_URL`，默认 `https://api.anysearch.com` |
 | XCrawl | `XCRAWL_API_KEY` | `XCRAWL_BASE_URL`，默认 `https://run.xcrawl.com` |
 | DeepSeek | `DEEPSEEK_API_KEY` | 无标准环境变量；默认 `https://api.deepseek.com/anthropic/v1` |
+| xAI Search | `XAI_AUTH_JSON` | 无标准环境变量；默认 `https://cli-chat-proxy.grok.com/v1`，模型 `grok-4.6` |
 
 自定义 Instance 使用 `apiKeyEnv` 和 `baseUrlEnv` 指定自己的环境变量。所有远端 Provider 都可以设置 `baseUrl` 和附加 `headers`。公共 `api.firecrawl.dev` 需要 key；自托管 Firecrawl v2 可以不设置 key。
 

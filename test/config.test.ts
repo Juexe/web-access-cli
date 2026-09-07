@@ -198,6 +198,37 @@ test("DeepSeek 默认 endpoint 固定且缺少 key 时 doctor 失败", () => {
 	}
 });
 
+test("xAI Search instance 使用 OAuth 文件、模型环境变量和 Search-only capability", () => {
+	const fixture = configFile({
+		providers: [
+			{
+				id: "xai_web_search",
+				type: "xai_web_search",
+				authJson: "./xai-auth.json",
+			},
+		],
+		search: { providers: ["xai_web_search"] },
+		extract: { providers: ["http"] },
+	});
+	try {
+		const loaded = loadConfig(fixture.path, {
+			XAI_AUTH_JSON: "./ignored-auth.json",
+			XAI_MODEL: "grok-test",
+		});
+		const xai = loaded.instances.find((item) => item.id === "xai_web_search");
+		assert.equal(xai?.authJson, "./ignored-auth.json");
+		assert.equal(xai?.authJsonSource, "standard_env");
+		assert.equal(xai?.credentialSource, "auth_json");
+		assert.equal(xai?.model, "grok-test");
+		assert.equal(xai?.baseUrl, "https://cli-chat-proxy.grok.com/v1");
+		assert.equal(capabilitySupports("xai_web_search", "search"), true);
+		assert.equal(capabilitySupports("xai_web_search", "extract"), false);
+		assert.equal(executeDoctor(loaded).ok, false);
+	} finally {
+		fixture.cleanup();
+	}
+});
+
 test("Bocha 使用标准环境变量、默认 endpoint 和 Search-only capability", () => {
 	const fixture = configFile({
 		providers: [
@@ -330,6 +361,8 @@ test("providers 省略或为空时合并全部内置 instance，自定义 id 只
 		"anysearch",
 		"xcrawl",
 		"deepseek",
+		"xai_x_search",
+		"xai_web_search",
 	];
 	try {
 		assert.deepEqual(
@@ -376,13 +409,19 @@ test("缺省 route 覆盖全部支持能力的内置 provider，显式空 route 
 				{ search: true, extract: true },
 			);
 		}
+		assert.deepEqual(loaded.app.search.providers.at(-1), "xai_web_search");
+		assert.equal(loaded.app.search.providers.includes("xai_x_search"), false);
 		for (const capability of ["search", "extract"] as const) {
 			const route =
 				capability === "search"
 					? loaded.app.search.providers
 					: loaded.app.extract.providers;
 			const supported = loaded.instances
-				.filter((instance) => capabilitySupports(instance.type, capability))
+				.filter(
+					(instance) =>
+						capabilitySupports(instance.type, capability) &&
+						instance.id !== "xai_x_search",
+				)
 				.map((instance) => instance.id);
 			assert.equal(new Set(route).size, route.length);
 			assert.deepEqual([...route].sort(), supported.sort());

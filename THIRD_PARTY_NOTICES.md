@@ -46,6 +46,17 @@ DeepSeek Search Provider 的 Anthropic-compatible Messages wire shape、结构�
 
 动态 Settings、Credential Service、Session event、LLM seam 和 Agent 集成代码没有进入本项目。
 
+## Grok Build xAI Search
+
+The xAI hosted search request and response mapping is derived from the `grok-build` project:
+
+- Repository: `https://github.com/xai-org/grok-build`
+- Source revision: `a549186d9d39311f2d3ee4208db62af8c65aa476`
+- Copyright 2023-2026 SpaceXAI
+- License: Apache-2.0
+
+The adapted code is limited to the Responses tool wire shape and citation mapping. The full Apache-2.0 license is retained in the upstream repository.
+
 ## npm 依赖
 
 发行包直接使用以下开源组件：

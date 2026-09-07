@@ -58,6 +58,10 @@ export function instance(
 		baseUrl: `https://${type}.test`,
 		baseUrlSource: "config",
 		headers: {},
+		authJson: null,
+		authJsonSource: "missing",
+		model: null,
+		modelSource: "missing",
 		...overrides,
 	};
 }

@@ -25,6 +25,7 @@ export const DEFAULT_SEARCH_PROVIDERS = [
 	"anysearch",
 	"xcrawl",
 	"deepseek",
+	"xai_web_search",
 ] as const;
 export const DEFAULT_EXTRACT_PROVIDERS = [
 	"firecrawl",
@@ -61,6 +62,8 @@ const SEARCH_TYPES = new Set<ProviderType>([
 	"anysearch",
 	"xcrawl",
 	"deepseek",
+	"xai_x_search",
+	"xai_web_search",
 ]);
 const EXTRACT_TYPES = new Set<ProviderType>([
 	"firecrawl",
@@ -83,6 +86,8 @@ const DEFAULT_INSTANCE_CONFIGS: ProviderInstanceConfig[] = [
 	{ id: "anysearch", type: "anysearch", searchFilterMode: "strict" },
 	{ id: "xcrawl", type: "xcrawl", searchFilterMode: "strict" },
 	{ id: "deepseek", type: "deepseek" },
+	{ id: "xai_x_search", type: "xai_x_search" },
+	{ id: "xai_web_search", type: "xai_web_search" },
 ];
 
 const STANDARD_KEY_ENV: Partial<Record<ProviderType, string>> = {
@@ -97,6 +102,16 @@ const STANDARD_KEY_ENV: Partial<Record<ProviderType, string>> = {
 	deepseek: "DEEPSEEK_API_KEY",
 };
 
+const STANDARD_AUTH_JSON_ENV: Partial<Record<ProviderType, string>> = {
+	xai_x_search: "XAI_AUTH_JSON",
+	xai_web_search: "XAI_AUTH_JSON",
+};
+
+const STANDARD_MODEL_ENV: Partial<Record<ProviderType, string>> = {
+	xai_x_search: "XAI_MODEL",
+	xai_web_search: "XAI_MODEL",
+};
+
 const STANDARD_BASE_ENV: Partial<Record<ProviderType, string>> = {
 	tavily: "TAVILY_BASE_URL",
 	exa: "EXA_BASE_URL",
@@ -109,6 +124,9 @@ const STANDARD_BASE_ENV: Partial<Record<ProviderType, string>> = {
 	xcrawl: "XCRAWL_BASE_URL",
 };
 
+const DEFAULT_BASE_URLS_XAI = "https://cli-chat-proxy.grok.com/v1";
+const DEFAULT_XAI_MODEL = "grok-4.6";
+
 const SEARCH_FILTER_TYPES = new Set<ProviderType>(["anysearch", "xcrawl"]);
 
 const ALLOWED_INSTANCE_KEYS = new Set([
@@ -120,6 +138,10 @@ const ALLOWED_INSTANCE_KEYS = new Set([
 	"baseUrlEnv",
 	"headers",
 	"searchFilterMode",
+	"authJson",
+	"authJsonEnv",
+	"model",
+	"modelEnv",
 ]);
 const ALLOWED_SEARCH_KEYS = new Set([
 	"providers",
@@ -262,6 +284,13 @@ function parseInstance(value: unknown, index: number): ProviderInstanceConfig {
 		value.baseUrlEnv,
 		`${path}.baseUrlEnv`,
 	);
+	const authJson = parseOptionalString(value.authJson, `${path}.authJson`);
+	const authJsonEnvRaw = parseOptionalString(
+		value.authJsonEnv,
+		`${path}.authJsonEnv`,
+	);
+	const model = parseOptionalString(value.model, `${path}.model`);
+	const modelEnvRaw = parseOptionalString(value.modelEnv, `${path}.modelEnv`);
 	const headers = normalizeHeaders(value.headers, `${path}.headers`);
 	const searchFilterMode =
 		value.searchFilterMode === undefined
@@ -284,6 +313,15 @@ function parseInstance(value: unknown, index: number): ProviderInstanceConfig {
 		throw new ConfigError(
 			`${path}.searchFilterMode 仅适用于 anysearch 或 xcrawl`,
 		);
+	if (
+		type !== "xai_x_search" &&
+		type !== "xai_web_search" &&
+		(authJson !== undefined ||
+			authJsonEnvRaw !== undefined ||
+			model !== undefined ||
+			modelEnvRaw !== undefined)
+	)
+		throw new ConfigError(`${path}.authJson/model 仅适用于 xAI provider`);
 	return {
 		id,
 		type: type as ProviderType,
@@ -294,6 +332,14 @@ function parseInstance(value: unknown, index: number): ProviderInstanceConfig {
 		...(baseUrl ? { baseUrl } : {}),
 		...(baseUrlEnvRaw
 			? { baseUrlEnv: validateEnvName(baseUrlEnvRaw, `${path}.baseUrlEnv`) }
+			: {}),
+		...(authJson ? { authJson } : {}),
+		...(authJsonEnvRaw
+			? { authJsonEnv: validateEnvName(authJsonEnvRaw, `${path}.authJsonEnv`) }
+			: {}),
+		...(model ? { model } : {}),
+		...(modelEnvRaw
+			? { modelEnv: validateEnvName(modelEnvRaw, `${path}.modelEnv`) }
 			: {}),
 		...(headers ? { headers } : {}),
 		...(searchFilterMode
@@ -509,11 +555,27 @@ function resolveProvider(
 		instance.id === instance.type ? STANDARD_KEY_ENV[instance.type] : undefined;
 	const keyEnv = resolveEnvValue(instance.apiKeyEnv, standardKeyEnv, env);
 	const apiKey = keyEnv.value ?? instance.apiKey ?? null;
-	const credentialSource = apiKey
-		? keyEnv.value
-			? keyEnv.source
-			: "config"
-		: "missing";
+	const standardAuthEnv =
+		instance.id === instance.type
+			? STANDARD_AUTH_JSON_ENV[instance.type]
+			: undefined;
+	const authEnv = resolveEnvValue(instance.authJsonEnv, standardAuthEnv, env);
+	const authJson = authEnv.value ?? instance.authJson ?? null;
+	const isXai =
+		instance.type === "xai_x_search" || instance.type === "xai_web_search";
+	const credentialSource = isXai
+		? authJson
+			? authEnv.value
+				? authEnv.source === "custom_env"
+					? "custom_auth_json"
+					: "auth_json"
+				: "auth_json"
+			: "missing"
+		: apiKey
+			? keyEnv.value
+				? keyEnv.source
+				: "config"
+			: "missing";
 	const standardBaseEnv =
 		instance.id === instance.type
 			? STANDARD_BASE_ENV[instance.type]
@@ -527,6 +589,7 @@ function resolveProvider(
 		baseEnv.value ??
 		instance.baseUrl ??
 		DEFAULT_BASE_URLS[instance.type] ??
+		(isXai ? DEFAULT_BASE_URLS_XAI : undefined) ??
 		null;
 	const baseUrl = rawBaseUrl
 		? normalizeBaseUrl(
@@ -545,6 +608,21 @@ function resolveProvider(
 			: DEFAULT_BASE_URLS[instance.type]
 				? "default"
 				: "missing";
+	const standardModelEnv =
+		instance.id === instance.type
+			? STANDARD_MODEL_ENV[instance.type]
+			: undefined;
+	const modelEnv = resolveEnvValue(instance.modelEnv, standardModelEnv, env);
+	const model = isXai
+		? (modelEnv.value ?? instance.model ?? DEFAULT_XAI_MODEL)
+		: null;
+	const modelSource = isXai
+		? modelEnv.value
+			? modelEnv.source
+			: instance.model
+				? "config"
+				: "default"
+		: "missing";
 	return {
 		id: instance.id,
 		type: instance.type,
@@ -553,6 +631,14 @@ function resolveProvider(
 		baseUrl,
 		baseUrlSource,
 		headers: { ...(instance.headers ?? {}) },
+		authJson,
+		authJsonSource: authJson
+			? authEnv.value
+				? authEnv.source
+				: "config"
+			: "missing",
+		model,
+		modelSource,
 		searchFilterMode:
 			instance.searchFilterMode ??
 			(SEARCH_FILTER_TYPES.has(instance.type) ? "strict" : null),
@@ -569,6 +655,8 @@ const DEFAULT_BASE_URLS: Partial<Record<ProviderType, string>> = {
 	anysearch: "https://api.anysearch.com",
 	xcrawl: "https://run.xcrawl.com",
 	deepseek: "https://api.deepseek.com/anthropic/v1",
+	xai_x_search: DEFAULT_BASE_URLS_XAI,
+	xai_web_search: DEFAULT_BASE_URLS_XAI,
 };
 
 export interface LoadedConfig {

@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { WebAccessError } from "../src/core/errors.ts";
 import type {
@@ -459,6 +462,116 @@ test("DeepSeek freshness 预检查不发请求", async () => {
 			error.retryable === true,
 	);
 	assert.equal(transport.calls.length, 0);
+});
+
+test("xAI hosted search 映射引用、域名过滤并脱敏 OAuth token", async () => {
+	const directory = mkdtempSync(join(tmpdir(), "web-access-xai-"));
+	const authPath = join(directory, "auth.json");
+	writeFileSync(
+		authPath,
+		JSON.stringify({ access_token: "oauth-secret-token" }),
+		"utf8",
+	);
+	try {
+		const transport = new MockTransport((url, options) => {
+			assert.equal(url, "https://xai_web_search.test/responses");
+			assert.equal(options.headers?.Authorization, "Bearer oauth-secret-token");
+			assert.equal(options.headers?.["X-XAI-Token-Auth"], "xai-grok-cli");
+			assert.equal(options.headers?.["x-grok-client-identifier"], "grok-shell");
+			const body = JSON.parse(options.body ?? "");
+			assert.equal(body.model, "grok-4.6");
+			assert.deepEqual(body.tools, [
+				{ type: "web_search", filters: { allowed_domains: ["example.com"] } },
+			]);
+			return response({
+				output: [
+					{
+						type: "web_search_call",
+						action: {
+							sources: [
+								{
+									type: "url",
+									url: "https://example.com/source",
+									title: "Source",
+								},
+								{
+									type: "url",
+									url: "https://blocked.test/no",
+									title: "Blocked",
+								},
+							],
+						},
+					},
+					{
+						type: "message",
+						content: [
+							{
+								type: "output_text",
+								text: "See https://example.com/source.",
+								annotations: [
+									{
+										type: "url_citation",
+										url: "https://example.com/source",
+										title: "Source citation",
+										start_index: 4,
+										end_index: 30,
+									},
+								],
+							},
+						],
+					},
+				],
+				token: "oauth-secret-token",
+			});
+		});
+		const adapter = getAdapter("xai_web_search", "search");
+		assert.ok(adapter?.search);
+		const request = searchRequest("xai_web_search", transport);
+		request.freshness = undefined;
+		request.includeDomains = ["example.com"];
+		request.excludeDomains = [];
+		request.instance.authJson = authPath;
+		request.instance.baseUrl = "https://xai_web_search.test";
+		request.instance.model = "grok-4.6";
+		const result = await adapter.search(request);
+		assert.deepEqual(result.data.results, [
+			{
+				rank: 1,
+				title: "Source citation",
+				url: "https://example.com/source",
+				snippet: "See https://example.com/source.",
+			},
+		]);
+		assert.doesNotMatch(JSON.stringify(result.raw), /oauth-secret-token/);
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});
+
+test("xAI x_search 拒绝 freshness，并只接受真实引用", async () => {
+	const directory = mkdtempSync(join(tmpdir(), "web-access-xai-"));
+	const authPath = join(directory, "auth.json");
+	writeFileSync(
+		authPath,
+		JSON.stringify({ access_token: "oauth-secret-token" }),
+		"utf8",
+	);
+	try {
+		const transport = new MockTransport(() => response({ output: [] }));
+		const adapter = getAdapter("xai_x_search", "search");
+		assert.ok(adapter?.search);
+		const request = searchRequest("xai_x_search", transport);
+		request.instance.authJson = authPath;
+		await assert.rejects(
+			adapter.search(request),
+			(error: unknown) =>
+				error instanceof WebAccessError &&
+				error.code === "provider_unavailable" &&
+				transport.calls.length === 0,
+		);
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
 });
 
 test("AnySearch Search 使用固定 REST 协议并执行本地域名过滤", async () => {

@@ -82,6 +82,14 @@
                   {
                     "type": "string",
                     "const": "deepseek"
+                  },
+                  {
+                    "type": "string",
+                    "const": "xai_x_search"
+                  },
+                  {
+                    "type": "string",
+                    "const": "xai_web_search"
                   }
                 ]
               }
@@ -145,6 +153,71 @@
                   {
                     "type": "string",
                     "const": "best_effort"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "type"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "apiKey": {
+                "type": "string"
+              },
+              "apiKeyEnv": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "baseUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "baseUrlEnv": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "headers": {
+                "type": "object",
+                "patternProperties": {
+                  "^[^\\r\\n]+$": {
+                    "type": "string",
+                    "pattern": "^[^\\r\\n]*$"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authJson": {
+                "type": "string"
+              },
+              "authJsonEnv": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "model": {
+                "type": "string"
+              },
+              "modelEnv": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "xai_x_search"
+                  },
+                  {
+                    "type": "string",
+                    "const": "xai_web_search"
                   }
                 ]
               }

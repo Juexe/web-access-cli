@@ -8,6 +8,7 @@ import { BOCHA_ADAPTER } from "./bocha.ts";
 import { DEEPSEEK_ADAPTER } from "./deepseek.ts";
 import { EXTRACT_ADAPTERS } from "./extract.ts";
 import { EXA_ADAPTER, SEARCH_ADAPTERS } from "./search.ts";
+import { XAI_WEB_SEARCH_ADAPTER, XAI_X_SEARCH_ADAPTER } from "./xai.ts";
 import { XCRAWL_ADAPTER } from "./xcrawl.ts";
 
 const adapters = [...SEARCH_ADAPTERS, ...EXTRACT_ADAPTERS].reduce<
@@ -33,6 +34,8 @@ const adapters = [...SEARCH_ADAPTERS, ...EXTRACT_ADAPTERS].reduce<
 		[ANYSEARCH_ADAPTER.type, ANYSEARCH_ADAPTER],
 		[XCRAWL_ADAPTER.type, XCRAWL_ADAPTER],
 		[DEEPSEEK_ADAPTER.type, DEEPSEEK_ADAPTER],
+		[XAI_X_SEARCH_ADAPTER.type, XAI_X_SEARCH_ADAPTER],
+		[XAI_WEB_SEARCH_ADAPTER.type, XAI_WEB_SEARCH_ADAPTER],
 	]),
 );
 

@@ -64,6 +64,8 @@ test("config edit 创建完整默认配置后再调用编辑器", async (t) => {
 		{ id: "anysearch", type: "anysearch", searchFilterMode: "strict" },
 		{ id: "xcrawl", type: "xcrawl", searchFilterMode: "strict" },
 		{ id: "deepseek", type: "deepseek" },
+		{ id: "xai_x_search", type: "xai_x_search" },
+		{ id: "xai_web_search", type: "xai_web_search" },
 	]);
 	assert.deepEqual(parsed.search, {
 		providers: [
@@ -75,6 +77,7 @@ test("config edit 创建完整默认配置后再调用编辑器", async (t) => {
 			"anysearch",
 			"xcrawl",
 			"deepseek",
+			"xai_web_search",
 		],
 		limit: 5,
 		timeoutMs: 60_000,
