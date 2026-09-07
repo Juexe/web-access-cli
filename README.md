@@ -13,7 +13,7 @@ The CLI is the primary product interface. It is not tied to Pi, Claude Code, Cod
 
 | Capability | Provider types | Normalized output |
 | --- | --- | --- |
-| `search` | Tavily, Exa, Bocha, Brave, SearXNG, AnySearch, XCrawl, DeepSeek | `rank`, `title`, `url`, `snippet` |
+| `search` | Tavily, Exa, Bocha, Brave, SearXNG, AnySearch, XCrawl, DeepSeek, xAI x_search, xAI web_search | `rank`, `title`, `url`, `snippet` |
 | `extract` | Firecrawl v2, Jina Reader, Exa Contents, AnySearch, XCrawl, HTTP | Markdown `Document` |
 
 A provider type describes an implementation, while a provider instance is a configurable instance of that type. One type can have multiple instances, such as `exa_team` and `exa_personal`. A `providers` route is an ordered array of instance IDs that determines which instances are enabled and the initial `auto` order. The CLI stores the learned effective order in the sibling `_providers` field.
@@ -84,8 +84,8 @@ web-access extract https://example.com/article
 web-access extract https://example.com/article --provider http --timeout 30000
 web-access extract https://example.com/article --json
 
-web-access providers --pretty
-web-access doctor --pretty
+web-access providers
+web-access doctor
 
 web-access config edit
 web-access --config "/path/to/config.json" config edit
@@ -96,10 +96,10 @@ The CLI provides the `search` and `extract` capability commands, the `providers`
 ### Global options
 
 - `--config <path>`: Explicitly select a configuration file.
-- `--pretty`: Pretty-print JSON. By default, JSON is written on a single line.
+- `--json`: Output a compact schema v2 JSON envelope. Without it, successful commands write human-readable Markdown; all failures always write JSON.
 - `--help`, `--version`: Print standard CLI help or version text.
 
-Extract succeeds with Markdown by default. Its YAML front matter contains only the final Instance ID (`provider`), the returned document URL (`url`), and a non-empty trimmed title (`title`). Add `extract --json` when a schema v2 envelope is required; `--pretty` and `--debug` also select JSON. Extract failures, including `partial` results, always remain JSON envelopes. Search, diagnostics, and `config edit` continue to output JSON. Diagnostic messages are never mixed into stdout.
+Successful commands default to Markdown for human readers. `search` writes a YAML front matter block followed by a numbered result list; `extract` writes YAML front matter followed by the normalized Markdown body; `providers`, `doctor`, and `config edit` write a heading followed by pretty-printed JSON data. Add `--json` when a schema v2 envelope is required. Extract `partial` results and all failures, including invalid input and runtime errors, always remain JSON envelopes. Diagnostic messages are never mixed into stdout.
 
 ## Configuration
 
@@ -115,7 +115,7 @@ The complete JSON Schema is available at [schemas/config.schema.json](schemas/co
 
 ```json
 {
-  "$schema": "https://unpkg.com/web-access-cli@0.3.0/schemas/config.schema.json",
+  "$schema": "https://unpkg.com/web-access-cli@0.4.0/schemas/config.schema.json",
   "providers": [
     {
       "id": "exa_team",
@@ -153,7 +153,7 @@ The complete JSON Schema is available at [schemas/config.schema.json](schemas/co
 }
 ```
 
-The built-in instances are `tavily`, `exa`, `bocha`, `brave`, `searxng`, `firecrawl`, `jina`, `http`, `anysearch`, `xcrawl`, , `xai_x_search`, and `xai_web_search`. A configuration entry with the same ID overrides fields on the built-in instance. A custom ID creates another instance of the selected type. An instance is enabled only when it appears in the corresponding `providers` route. Bocha defaults to `https://api.bocha.cn` and requires an API key; AnySearch defaults to `https://api.anysearch.com` and supports anonymous calls; XCrawl defaults to `https://run.xcrawl.com` and requires an API key; DeepSeek defaults to `https://api.deepseek.com/anthropic/v1` and requires an API key.
+The built-in instances are `tavily`, `exa`, `bocha`, `brave`, `searxng`, `firecrawl`, `jina`, `http`, `anysearch`, `xcrawl`, `deepseek`, `xai_x_search`, and `xai_web_search`. A configuration entry with the same ID overrides fields on the built-in instance. A custom ID creates another instance of the selected type. An instance is enabled only when it appears in the corresponding `providers` route. Bocha defaults to `https://api.bocha.cn` and requires an API key; AnySearch defaults to `https://api.anysearch.com` and supports anonymous calls; XCrawl defaults to `https://run.xcrawl.com` and requires an API key; DeepSeek defaults to `https://api.deepseek.com/anthropic/v1` and requires an API key.
 
 Default routes:
 
@@ -227,9 +227,9 @@ Capability commands use output schema version 2. Their default envelope is inten
 }
 ```
 
-Default capability output contains only `schemaVersion`, `ok`, the final Instance ID and normalized `data`. Failures contain a compact `error` and, when providers were attempted, `attempts` entries with only Instance ID, error code and optional HTTP status. Extract quality failures may include a `partial` document without raw provider data. If the learned order cannot be written, either a success or failure envelope additionally contains `warnings: [{ "code": "provider_order_update_failed", "message": "..." }]` without replacing the primary result. Search and extract input errors use the same compact failure shape.
+With `--json`, capability output contains only `schemaVersion`, `ok`, the final Instance ID and normalized `data`. Failures contain a compact `error` and, when providers were attempted, `attempts` entries with only Instance ID, error code and optional HTTP status. Extract quality failures may include a `partial` document without raw provider data. If the learned order cannot be written, either a success or failure envelope additionally contains `warnings: [{ "code": "provider_order_update_failed", "message": "..." }]` without replacing the primary result. Search and extract input errors use the same compact failure shape.
 
-For human-readable extraction, the default Markdown output starts with YAML front matter and then the provider-normalized Markdown body. Metadata values use JSON double-quoted scalar encoding and the body is not modified. Existing scripts and other machine consumers should append `--json` explicitly.
+For human-readable output, extraction starts with YAML front matter and then the provider-normalized Markdown body. Search results use a numbered Markdown list; diagnostics and config edit use a heading plus pretty-printed JSON data. Metadata values use JSON double-quoted scalar encoding and the body is not modified. Existing scripts and other machine consumers should append `--json` explicitly.
 
 Example default extract output:
 
@@ -243,7 +243,7 @@ title: "Example title"
 # Article content
 ```
 
-Use `--debug` on `search` or `extract` only for protocol troubleshooting. It adds a nested `debug` object containing the request, durations, complete attempts and the final or best-failure raw response. Raw data remains recursively redacted and is not part of normal Agent calls. `providers`, `doctor`, and `config edit` retain their detailed diagnostic envelopes; all envelopes use schema version 2. Stable schemas are available in [schemas](schemas).
+All success and failure envelopes use schema version 2. Stable schemas are available in [schemas](schemas).
 
 Exit codes:
 

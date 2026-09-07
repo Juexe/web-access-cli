@@ -13,7 +13,7 @@ CLI 是主要产品形态，不绑定 Pi、Claude Code、Codex、Cursor、OpenCo
 
 | 能力 | Provider Type | 统一输出 |
 | --- | --- | --- |
-| `search` | Tavily、Exa、Bocha、Brave、SearXNG、AnySearch、XCrawl、DeepSeek | `rank`、`title`、`url`、`snippet` |
+| `search` | Tavily、Exa、Bocha、Brave、SearXNG、AnySearch、XCrawl、DeepSeek、xAI x_search、xAI web_search | `rank`、`title`、`url`、`snippet` |
 | `extract` | Firecrawl v2、Jina Reader、Exa Contents、AnySearch、XCrawl、HTTP | Markdown `Document` |
 
 Provider Type 描述实现类型；Provider Instance 是一份可配置实例。一个 Type 可以有多个 Instance，例如 `exa_team` 和 `exa_personal`。`providers` Route 是有序 Instance ID 数组，决定启用状态和 `auto` 的初始顺序；CLI 会把学习后的实际顺序保存在同级 `_providers`。
@@ -84,8 +84,8 @@ web-access extract https://example.com/article
 web-access extract https://example.com/article --provider http --timeout 30000
 web-access extract https://example.com/article --json
 
-web-access providers --pretty
-web-access doctor --pretty
+web-access providers
+web-access doctor
 
 web-access config edit
 web-access --config "/path/to/config.json" config edit
@@ -96,10 +96,10 @@ CLI 提供 `search`、`extract` 两个能力命令，`providers`、`doctor` 两�
 ### 通用选项
 
 - `--config <path>`：显式指定配置文件。
-- `--pretty`：格式化 JSON；默认输出单行 JSON。
+- `--json`：输出紧凑 schema v2 JSON envelope；不指定时，成功命令输出面向人的 Markdown，失败始终输出 JSON。
 - `--help`、`--version`：输出常规 CLI 帮助或版本文本。
 
-`extract` 成功时默认输出 Markdown，文首 YAML front matter 只包含最终 Instance ID（`provider`）、Provider 返回的文档 URL（`url`）和非空的去除首尾空白标题（`title`）。需要 schema v2 envelope 时显式追加 `extract --json`；`--pretty` 和 `--debug` 也会选择 JSON。提取失败（包括 `partial`）始终输出 JSON envelope。`search`、诊断命令和 `config edit` 继续输出 JSON。诊断信息不会混入 stdout。
+成功命令默认输出面向人的 Markdown。`search` 输出 YAML front matter 和编号结果列表；`extract` 输出 YAML front matter 和规范化后的 Markdown 正文；`providers`、`doctor` 和 `config edit` 输出标题和格式化 JSON 数据。需要 schema v2 envelope 时显式追加 `--json`。提取失败（包括 `partial`）以及所有失败路径始终输出 JSON envelope。诊断信息不会混入 stdout。
 
 ## 配置
 
@@ -115,7 +115,7 @@ CLI 提供 `search`、`extract` 两个能力命令，`providers`、`doctor` 两�
 
 ```json
 {
-  "$schema": "https://unpkg.com/web-access-cli@0.3.0/schemas/config.schema.json",
+  "$schema": "https://unpkg.com/web-access-cli@0.4.0/schemas/config.schema.json",
   "providers": [
     {
       "id": "exa_team",
@@ -227,9 +227,9 @@ Attempt 会保留 Provider 的原始错误码、HTTP status 和 `retryable` 值�
 }
 ```
 
-能力命令成功时默认只有 `schemaVersion`、`ok`、最终 Instance ID 和规范化 `data`。失败时包含精简 `error`；实际尝试过 Provider 时，`attempts` 只保留 Instance ID、错误码和可选 HTTP status。提取质量失败可包含不含 raw 的 `partial` 文档。排序无法写回时，成功或失败 envelope 会额外包含 `warnings: [{ "code": "provider_order_update_failed", "message": "..." }]`，但不会覆盖主要结果。搜索和提取输入错误也使用相同的精简失败结构。
+使用 `--json` 时，能力命令成功只包含 `schemaVersion`、`ok`、最终 Instance ID 和规范化 `data`。失败时包含精简 `error`；实际尝试过 Provider 时，`attempts` 只保留 Instance ID、错误码和可选 HTTP status。提取质量失败可包含不含 raw 的 `partial` 文档。排序无法写回时，成功或失败 envelope 会额外包含 `warnings: [{ "code": "provider_order_update_failed", "message": "..." }]`，但不会覆盖主要结果。搜索和提取输入错误也使用相同的精简失败结构。
 
-面向人的提取默认输出以 YAML front matter 开头、随后是 Provider 规范化的 Markdown 正文。元数据值统一使用 JSON 双引号标量编码，正文内容不改写。已有脚本和其他机器消费者应显式追加 `--json`。
+面向人的输出中，提取以 YAML front matter 开头、随后是 Provider 规范化的 Markdown 正文；搜索使用编号 Markdown 列表；诊断和配置编辑使用标题加格式化 JSON 数据。元数据值统一使用 JSON 双引号标量编码，正文内容不改写。已有脚本和其他机器消费者应显式追加 `--json`。
 
 默认提取输出示例：
 
@@ -243,7 +243,7 @@ title: "Example title"
 # Article content
 ```
 
-只有协议排障时才在 `search` 或 `extract` 上使用 `--debug`。该选项会增加嵌套 `debug`，其中包含 request、耗时、完整 attempts 以及最终成功或最佳失败的 raw 响应；raw 仍会递归脱敏，常规 Agent 调用不应使用此选项。`providers`、`doctor` 和 `config edit` 保留详细诊断 envelope；所有 envelope 使用 schema version 2。稳定 schema 位于 [schemas](schemas)。
+所有成功和失败 envelope 使用 schema version 2。稳定 schema 位于 [schemas](schemas)。
 
 退出码：
 

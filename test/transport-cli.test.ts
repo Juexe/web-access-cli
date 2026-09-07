@@ -389,7 +389,10 @@ test("CLI 将成功 provider 写到队头并在下一进程优先使用", async 
 		WEB_ACCESS_CONFIG: "",
 	};
 
-	const first = await runCli(["--config", path, "search", "adaptive"], env);
+	const first = await runCli(
+		["--config", path, "search", "adaptive", "--json"],
+		env,
+	);
 	assert.equal(first.status, 0);
 	assert.equal(first.stderr, "");
 	assert.equal(JSON.parse(first.stdout).provider, "search_b");
@@ -398,14 +401,17 @@ test("CLI 将成功 provider 写到队头并在下一进程优先使用", async 
 		"search_a",
 	]);
 
-	const second = await runCli(["--config", path, "search", "adaptive"], env);
+	const second = await runCli(
+		["--config", path, "search", "adaptive", "--json"],
+		env,
+	);
 	assert.equal(second.status, 0);
 	assert.equal(second.stderr, "");
 	assert.equal(JSON.parse(second.stdout).provider, "search_b");
 	assert.deepEqual(requests, { a: 1, b: 2 });
 });
 
-test("CLI extract 默认输出 Markdown，结构化选项输出 JSON", async (t) => {
+test("CLI extract 默认输出 Markdown，--json 输出 JSON", async (t) => {
 	const baseUrl = await extractServerUrl(t);
 	const directory = mkdtempSync(
 		join(tmpdir(), "web-access-cli-extract-output-"),
@@ -437,19 +443,14 @@ test("CLI extract 默认输出 Markdown，结构化选项输出 JSON", async (t)
 	assert.match(markdown.stdout, /Article content/);
 	assert.equal(markdown.stdout.trimStart().startsWith("{"), false);
 
-	for (const option of ["--json", "--pretty", "--debug"]) {
-		const result = await runCli([...args, option], env);
-		assert.equal(result.status, 0, option);
-		assert.equal(result.stderr, "", option);
-		const envelope = JSON.parse(result.stdout) as Record<string, unknown>;
-		assert.equal(envelope.schemaVersion, 2, option);
-		assert.equal(envelope.ok, true, option);
-		assert.equal(envelope.provider, "local_http", option);
-		assert.equal(result.stdout.trimStart().startsWith("---"), false, option);
-		if (option === "--pretty")
-			assert.match(result.stdout, /\n {2}"schemaVersion": 2,/);
-		if (option === "--debug") assert.equal("debug" in envelope, true);
-	}
+	const json = await runCli([...args, "--json"], env);
+	assert.equal(json.status, 0);
+	assert.equal(json.stderr, "");
+	const envelope = JSON.parse(json.stdout) as Record<string, unknown>;
+	assert.equal(envelope.schemaVersion, 2);
+	assert.equal(envelope.ok, true);
+	assert.equal(envelope.provider, "local_http");
+	assert.equal(json.stdout.trimStart().startsWith("---"), false);
 
 	const failure = await runCli([...args.slice(0, -1), `${baseUrl}/fail`], env);
 	assert.equal(failure.status, 1);
@@ -496,8 +497,8 @@ test("CLI extract AnySearch 只输出 data.content 中的 Markdown", async (t) =
 test("CLI 输入错误保持单 JSON、空 stderr 与退出码契约", async (t) => {
 	const cases = [
 		{
-			name: "应用校验错误不受 debug 选项污染",
-			args: ["extract", "ftp://example.com", "--debug"],
+			name: "应用校验错误不受 JSON 选项污染",
+			args: ["extract", "ftp://example.com", "--json"],
 			assertEnvelope: (envelope: Record<string, unknown>) => {
 				assert.equal("command" in envelope, false);
 				assert.equal("debug" in envelope, false);
@@ -615,7 +616,7 @@ test("CLI config edit 使用 VISUAL 启动编辑器并保持单 JSON 契约", as
 	);
 	t.after(() => rmSync(directory, { recursive: true, force: true }));
 	const path = join(directory, "config.json");
-	const result = await runCli(["--config", path, "config", "edit"], {
+	const result = await runCli(["--config", path, "config", "edit", "--json"], {
 		...process.env,
 		VISUAL: process.execPath,
 		EDITOR: "definitely-not-used-editor",
