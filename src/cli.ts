@@ -7,7 +7,7 @@ import {
 	InvalidArgumentError,
 	Option,
 } from "commander";
-import { type CliOutputMode, formatExtractMarkdown } from "./cli-output.ts";
+import { type CliOutputMode, formatMarkdown } from "./cli-output.ts";
 import { loadConfig } from "./config/config.ts";
 import { executeConfigEdit } from "./config/edit.ts";
 import { createProviderOrderWriter } from "./config/provider-order.ts";
@@ -17,7 +17,6 @@ import { errorEnvelope, executeExtract, executeSearch } from "./core/router.ts";
 import type {
 	Command as EnvelopeCommand,
 	ExtractRequest,
-	ExtractSuccessEnvelope,
 	OutputEnvelope,
 	SearchFreshness,
 	SearchRequest,
@@ -28,7 +27,7 @@ import { VERSION } from "./version.ts";
 
 interface GlobalOptions {
 	config?: string;
-	pretty?: boolean;
+	json?: boolean;
 }
 
 interface CliDependencies {
@@ -73,46 +72,19 @@ function exitCode(envelope: OutputEnvelope): number {
 	return 1;
 }
 
-function writeEnvelope(envelope: OutputEnvelope, pretty: boolean): void {
-	process.stdout.write(
-		`${JSON.stringify(envelope, null, pretty ? 2 : undefined)}\n`,
-	);
+function writeEnvelope(envelope: OutputEnvelope): void {
+	process.stdout.write(`${JSON.stringify(envelope)}\n`);
 }
 
 function writeOutput(
 	envelope: OutputEnvelope,
 	mode: CliOutputMode,
-	pretty: boolean,
 ): void {
-	if (mode === "markdown" && isExtractSuccessEnvelope(envelope)) {
-		process.stdout.write(formatExtractMarkdown(envelope));
+	if (mode === "markdown" && envelope.ok) {
+		process.stdout.write(formatMarkdown(envelope));
 		return;
 	}
-	writeEnvelope(envelope, pretty);
-}
-
-function isExtractSuccessEnvelope(
-	envelope: OutputEnvelope,
-): envelope is ExtractSuccessEnvelope {
-	return (
-		envelope.ok &&
-		"provider" in envelope &&
-		typeof envelope.provider === "string" &&
-		"data" in envelope &&
-		typeof envelope.data === "object" &&
-		envelope.data !== null &&
-		"document" in envelope.data &&
-		typeof envelope.data.document === "object" &&
-		envelope.data.document !== null &&
-		"sourceUrl" in envelope.data.document &&
-		typeof envelope.data.document.sourceUrl === "string" &&
-		"title" in envelope.data.document &&
-		typeof envelope.data.document.title === "string" &&
-		"content" in envelope.data.document &&
-		typeof envelope.data.document.content === "string" &&
-		"contentType" in envelope.data.document &&
-		envelope.data.document.contentType === "text/markdown"
-	);
+	writeEnvelope(envelope);
 }
 
 export function createProgram(
@@ -129,7 +101,7 @@ export function createProgram(
 		.description("Agent-neutral 的网页搜索与内容提取 CLI")
 		.version(VERSION)
 		.option("--config <path>", "指定 JSON 配置文件")
-		.option("--pretty", "格式化 JSON 输出；extract 同时选择 JSON 模式", false)
+		.option("--json", "输出 JSON envelope", false)
 		.showSuggestionAfterError();
 	program.configureOutput({ writeErr: () => {}, outputError: () => {} });
 	program.exitOverride();
@@ -150,7 +122,6 @@ export function createProgram(
 		.option("--include-domain <domain>", "仅包含域名，可重复", collect, [])
 		.option("--exclude-domain <domain>", "排除域名，可重复", collect, [])
 		.option("--timeout <milliseconds>", "总超时毫秒数", integer)
-		.option("--debug", "输出完整路由和脱敏原始响应", false)
 		.action(
 			(
 				query: string,
@@ -161,7 +132,6 @@ export function createProgram(
 					includeDomain: string[];
 					excludeDomain: string[];
 					timeout?: number;
-					debug: boolean;
 				},
 			) => {
 				run(async () => {
@@ -183,7 +153,6 @@ export function createProgram(
 					return executeSearch(request, {
 						loaded,
 						signal: processSignal.signal,
-						debug: options.debug,
 						persistProviderOrder: createProviderOrderWriter(loaded),
 					});
 				});
@@ -193,13 +162,12 @@ export function createProgram(
 	program
 		.command("extract")
 		.description(
-			"提取网页正文并转换为 Markdown（--json/--pretty/--debug 输出 JSON）",
+				"提取网页正文并转换为 Markdown（使用 --json 输出 JSON）",
 		)
 		.argument("<url>", "HTTP(S) URL")
 		.option("-p, --provider <id>", "provider instance id，或 auto", "auto")
 		.option("--timeout <milliseconds>", "总超时毫秒数", integer)
 		.option("--json", "输出 JSON envelope", false)
-		.option("--debug", "输出完整路由和脱敏原始响应", false)
 		.action(
 			(
 				url: string,
@@ -207,12 +175,10 @@ export function createProgram(
 					provider: string;
 					timeout?: number;
 					json: boolean;
-					debug: boolean;
 				},
 			) => {
 				const globals = program.opts<GlobalOptions>();
-				const outputMode: CliOutputMode =
-					options.json || options.debug || globals.pretty ? "json" : "markdown";
+				const outputMode: CliOutputMode = options.json || globals.json ? "json" : "markdown";
 				run(async () => {
 					const loaded = loadConfig(globals.config);
 					const request: ExtractRequest = {
@@ -223,7 +189,6 @@ export function createProgram(
 					return executeExtract(request, {
 						loaded,
 						signal: processSignal.signal,
-						debug: options.debug,
 						persistProviderOrder: createProviderOrderWriter(loaded),
 					});
 				}, outputMode);
@@ -287,7 +252,7 @@ async function main(): Promise<void> {
 		const envelope = errorEnvelope(
 			new WebAccessError("invalid_input", "必须指定命令"),
 		);
-		writeEnvelope(envelope, false);
+		writeEnvelope(envelope);
 		process.exitCode = 2;
 		return;
 	}
@@ -295,11 +260,7 @@ async function main(): Promise<void> {
 		await program.parseAsync(process.argv);
 		if (!pending) throw new WebAccessError("invalid_input", "必须指定命令");
 		const envelope = await pending;
-		writeOutput(
-			envelope,
-			pendingOutputMode,
-			!!program.opts<GlobalOptions>().pretty,
-		);
+		writeOutput(envelope, pendingOutputMode);
 		process.exitCode = exitCode(envelope);
 	} catch (caught) {
 		if (
@@ -319,7 +280,7 @@ async function main(): Promise<void> {
 					)
 				: asWebAccessError(caught);
 		const envelope = errorEnvelope(normalized, envelopeCommand(program.args));
-		writeEnvelope(envelope, !!program.opts<GlobalOptions>().pretty);
+		writeEnvelope(envelope);
 		process.exitCode = exitCode(envelope);
 	}
 }
