@@ -139,8 +139,8 @@ The complete JSON Schema is available at [schemas/config.schema.json](schemas/co
   "search": {
     "providers": ["searx_local", "exa_team", "brave"],
     "limit": 5,
-    "timeoutMs": 60000,
-    "attemptTimeoutMs": 20000,
+    "timeoutMs": 120000,
+    "attemptTimeoutMs": 60000,
     "maxResponseBytes": 5242880
   },
   "extract": {
@@ -164,7 +164,7 @@ The default routes include every built-in instance that supports the correspondi
 
 DeepSeek Search performs a full Anthropic-compatible Messages model turn with the native `web_search_20250305` server tool, so it can have higher latency and cost than a dedicated search endpoint. It is last in the default route and is reached only after earlier providers are unavailable, return a final non-2xx HTTP response, or otherwise fail recoverably. The adapter accepts URLs only from structured `web_search_tool_result` blocks, joins citation excerpts by URL, and never extracts URLs from model prose. Domain constraints are rewritten into the query and strictly re-applied locally; `freshness` is unsupported and skips DeepSeek with a recoverable error. Redirects are rejected without contacting the `Location` target. Provider-private `encrypted_content` payloads are omitted from `raw` because they are opaque, cannot be displayed or decoded by the CLI, and add no diagnostic value.
 
-XAI hosted Search reads an external OAuth JSON file from `XAI_AUTH_JSON` on every call and uses only its `access_token`; an external CLIProxyAPI process owns refresh and write-back. Instance fields `authJson`/`authJsonEnv` and `model`/`modelEnv` override the path and model. `xai_web_search` accepts at most five allow or exclude domains (mutually exclusive); `xai_x_search` rejects `freshness`. Model-backed search can exceed the default 20-second attempt timeout, so configure Search `attemptTimeoutMs` and `timeoutMs` around 60000/120000 when needed.
+XAI hosted Search reads an external OAuth JSON file from `XAI_AUTH_JSON` on every call and uses only its `access_token`; an external CLIProxyAPI process owns refresh and write-back. Instance fields `authJson`/`authJsonEnv` and `model`/`modelEnv` override the path and model. `xai_web_search` accepts at most five allow or exclude domains (mutually exclusive); `xai_x_search` rejects `freshness`. Model-backed search can take longer than ordinary API searches; Search defaults allow up to 60 seconds per attempt and 120 seconds total.
 
 ### Credentials and URLs
 
@@ -203,7 +203,7 @@ An attempt keeps the provider's original error code, HTTP status, and `retryable
 
 Selecting an instance explicitly executes it strictly without fallback. If the instance is not in the route, the command returns `provider_disabled`.
 
-Default limits are a 60-second total timeout and a 20-second per-attempt timeout for Search, and 120 seconds and 45 seconds respectively for Extract. Each response has a hard limit of 5 MiB. `--timeout` overrides only the total timeout for the current command.
+Default limits are a 120-second total timeout and a 60-second per-attempt timeout for Search, and 120 seconds and 45 seconds respectively for Extract. Each response has a hard limit of 5 MiB. `--timeout` overrides only the total timeout for the current command.
 
 ## Output contract
 

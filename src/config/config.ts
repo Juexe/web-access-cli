@@ -40,8 +40,8 @@ export const DEFAULT_MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 const DEFAULT_SEARCH_CONFIG: SearchConfig = {
 	providers: [...DEFAULT_SEARCH_PROVIDERS],
 	limit: 5,
-	timeoutMs: 60_000,
-	attemptTimeoutMs: 20_000,
+	timeoutMs: 120_000,
+	attemptTimeoutMs: 60_000,
 	maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
 };
 

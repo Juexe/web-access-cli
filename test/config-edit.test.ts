@@ -80,8 +80,8 @@ test("config edit 创建完整默认配置后再调用编辑器", async (t) => {
 			"xai_web_search",
 		],
 		limit: 5,
-		timeoutMs: 60_000,
-		attemptTimeoutMs: 20_000,
+		timeoutMs: 120_000,
+		attemptTimeoutMs: 60_000,
 		maxResponseBytes: 5 * 1024 * 1024,
 	});
 	assert.deepEqual(parsed.extract, {

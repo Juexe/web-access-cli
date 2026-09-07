@@ -139,8 +139,8 @@ CLI 提供 `search`、`extract` 两个能力命令，`providers`、`doctor` 两�
   "search": {
     "providers": ["searx_local", "exa_team", "brave"],
     "limit": 5,
-    "timeoutMs": 60000,
-    "attemptTimeoutMs": 20000,
+    "timeoutMs": 120000,
+    "attemptTimeoutMs": 60000,
     "maxResponseBytes": 5242880
   },
   "extract": {
@@ -164,7 +164,7 @@ CLI 提供 `search`、`extract` 两个能力命令，`providers`、`doctor` 两�
 
 DeepSeek Search 通过 Anthropic-compatible Messages API 调用原生 `web_search_20250305` server tool，一次搜索是完整模型轮次，因此延迟和成本可能高于专用搜索 endpoint。它位于默认 Route 末尾，仅在前序 Provider 未配置、返回最终非 2xx HTTP 响应或发生其他可恢复失败后触发。Adapter 只接受 `web_search_tool_result` 中的结构化 URL，按 URL 合并 citation 摘要，绝不从模型 prose 中猜测 URL。域名条件会改写查询并在本地再次严格过滤；DeepSeek 不支持 `freshness`，遇到该参数时以可恢复错误跳过；重定向会被严格拒绝，且不会访问 `Location` 目标。Provider 私有的 `encrypted_content` 是 CLI 无法展示或解码的 opaque payload，不具备诊断价值，因此会从 `raw` 中移除。
 
-XAI hosted Search 使用 `XAI_AUTH_JSON` 指向外部 OAuth JSON 文件，每次调用只读取 `access_token`，由外部 CLIProxyAPI 负责刷新和回写。可用 `authJson`/`authJsonEnv` 与 `model`/`modelEnv` 为实例覆盖路径和模型。`xai_web_search` 支持最多 5 个 allow 或 exclude 域名（两者不能同时使用）；`xai_x_search` 不接受 `freshness`。模型搜索可能超过默认 20 秒单次超时，建议将 Search 的 `attemptTimeoutMs` 和 `timeoutMs` 提高到 60000/120000。
+XAI hosted Search 使用 `XAI_AUTH_JSON` 指向外部 OAuth JSON 文件，每次调用只读取 `access_token`，由外部 CLIProxyAPI 负责刷新和回写。可用 `authJson`/`authJsonEnv` 与 `model`/`modelEnv` 为实例覆盖路径和模型。`xai_web_search` 支持最多 5 个 allow 或 exclude 域名（两者不能同时使用）；`xai_x_search` 不接受 `freshness`。模型搜索可能需要更长时间；Search 默认单次超时 60 秒、总超时 120 秒。
 
 ### 凭据和 URL
 
@@ -203,7 +203,7 @@ Attempt 会保留 Provider 的原始错误码、HTTP status 和 `retryable` 值�
 
 显式指定 Instance 时严格执行，不触发 fallback。若实例不在 Route 中，返回 `provider_disabled`。
 
-默认上限：Search 总超时/单次超时为 60s/20s，Extract 为 120s/45s；单个响应硬上限为 5 MiB。`--timeout` 只覆盖本次命令的总超时。
+默认上限：Search 总超时/单次超时为 120s/60s，Extract 为 120s/45s；单个响应硬上限为 5 MiB。`--timeout` 只覆盖本次命令的总超时。
 
 ## 输出契约
 
