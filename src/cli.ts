@@ -76,10 +76,7 @@ function writeEnvelope(envelope: OutputEnvelope): void {
 	process.stdout.write(`${JSON.stringify(envelope)}\n`);
 }
 
-function writeOutput(
-	envelope: OutputEnvelope,
-	mode: CliOutputMode,
-): void {
+function writeOutput(envelope: OutputEnvelope, mode: CliOutputMode): void {
 	if (mode === "markdown" && envelope.ok) {
 		process.stdout.write(formatMarkdown(envelope));
 		return;
@@ -122,6 +119,7 @@ export function createProgram(
 		.option("--include-domain <domain>", "仅包含域名，可重复", collect, [])
 		.option("--exclude-domain <domain>", "排除域名，可重复", collect, [])
 		.option("--timeout <milliseconds>", "总超时毫秒数", integer)
+		.option("--json", "输出 JSON envelope", false)
 		.action(
 			(
 				query: string,
@@ -132,38 +130,42 @@ export function createProgram(
 					includeDomain: string[];
 					excludeDomain: string[];
 					timeout?: number;
+					json: boolean;
 				},
 			) => {
-				run(async () => {
-					const globals = program.opts<GlobalOptions>();
-					const loaded = loadConfig(globals.config);
-					const request: SearchRequest = {
-						query: query.trim(),
-						provider: options.provider.toLowerCase(),
-						limit: options.limit ?? loaded.app.search.limit,
-						freshness: options.freshness,
-						includeDomains: normalizeDomains(options.includeDomain),
-						excludeDomains: normalizeDomains(options.excludeDomain),
-						timeoutMs: options.timeout,
-					};
-					if (!request.query)
-						throw new WebAccessError("invalid_input", "query 不能为空");
-					if (request.limit > 20)
-						throw new WebAccessError("invalid_input", "limit 不能超过 20");
-					return executeSearch(request, {
-						loaded,
-						signal: processSignal.signal,
-						persistProviderOrder: createProviderOrderWriter(loaded),
-					});
-				});
+				run(
+					async () => {
+						const globals = program.opts<GlobalOptions>();
+						const loaded = loadConfig(globals.config);
+						const request: SearchRequest = {
+							query: query.trim(),
+							provider: options.provider.toLowerCase(),
+							limit: options.limit ?? loaded.app.search.limit,
+							freshness: options.freshness,
+							includeDomains: normalizeDomains(options.includeDomain),
+							excludeDomains: normalizeDomains(options.excludeDomain),
+							timeoutMs: options.timeout,
+						};
+						if (!request.query)
+							throw new WebAccessError("invalid_input", "query 不能为空");
+						if (request.limit > 20)
+							throw new WebAccessError("invalid_input", "limit 不能超过 20");
+						return executeSearch(request, {
+							loaded,
+							signal: processSignal.signal,
+							persistProviderOrder: createProviderOrderWriter(loaded),
+						});
+					},
+					options.json || program.opts<GlobalOptions>().json
+						? "json"
+						: "markdown",
+				);
 			},
 		);
 
 	program
 		.command("extract")
-		.description(
-				"提取网页正文并转换为 Markdown（使用 --json 输出 JSON）",
-		)
+		.description("提取网页正文并转换为 Markdown（使用 --json 输出 JSON）")
 		.argument("<url>", "HTTP(S) URL")
 		.option("-p, --provider <id>", "provider instance id，或 auto", "auto")
 		.option("--timeout <milliseconds>", "总超时毫秒数", integer)
@@ -178,7 +180,8 @@ export function createProgram(
 				},
 			) => {
 				const globals = program.opts<GlobalOptions>();
-				const outputMode: CliOutputMode = options.json || globals.json ? "json" : "markdown";
+				const outputMode: CliOutputMode =
+					options.json || globals.json ? "json" : "markdown";
 				run(async () => {
 					const loaded = loadConfig(globals.config);
 					const request: ExtractRequest = {
@@ -198,18 +201,27 @@ export function createProgram(
 	program
 		.command("providers")
 		.description("列出 provider instance、route 与配置状态")
-		.action(() =>
-			run(() =>
-				executeProviders(loadConfig(program.opts<GlobalOptions>().config)),
+		.option("--json", "输出 JSON envelope", false)
+		.action((options: { json: boolean }) =>
+			run(
+				() =>
+					executeProviders(loadConfig(program.opts<GlobalOptions>().config)),
+				options.json || program.opts<GlobalOptions>().json
+					? "json"
+					: "markdown",
 			),
 		);
 
 	program
 		.command("doctor")
 		.description("检查本地配置与已启用 provider 的可用性")
-		.action(() =>
-			run(() =>
-				executeDoctor(loadConfig(program.opts<GlobalOptions>().config)),
+		.option("--json", "输出 JSON envelope", false)
+		.action((options: { json: boolean }) =>
+			run(
+				() => executeDoctor(loadConfig(program.opts<GlobalOptions>().config)),
+				options.json || program.opts<GlobalOptions>().json
+					? "json"
+					: "markdown",
 			),
 		);
 
@@ -217,11 +229,16 @@ export function createProgram(
 	config
 		.command("edit")
 		.description("创建默认配置文件并用 VISUAL 或 EDITOR 打开")
-		.action(() =>
-			run(() =>
-				runConfigEdit({
-					explicitPath: program.opts<GlobalOptions>().config,
-				}),
+		.option("--json", "输出 JSON envelope", false)
+		.action((options: { json: boolean }) =>
+			run(
+				() =>
+					runConfigEdit({
+						explicitPath: program.opts<GlobalOptions>().config,
+					}),
+				options.json || program.opts<GlobalOptions>().json
+					? "json"
+					: "markdown",
 			),
 		);
 

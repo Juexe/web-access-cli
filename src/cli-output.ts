@@ -1,4 +1,10 @@
-import type { ExtractSuccessEnvelope, OutputEnvelope } from "./core/types.ts";
+import type {
+	ConfigEditSuccessEnvelope,
+	DiagnosticSuccessEnvelope,
+	ExtractSuccessEnvelope,
+	OutputEnvelope,
+	SearchSuccessEnvelope,
+} from "./core/types.ts";
 
 export type CliOutputMode = "json" | "markdown";
 
@@ -23,11 +29,21 @@ export function formatExtractMarkdown(
 }
 
 export function formatMarkdown(envelope: OutputEnvelope): string {
-	if ("document" in (envelope as any).data) return formatExtractMarkdown(envelope as ExtractSuccessEnvelope);
-	if ("results" in (envelope as any).data) {
-		const e = envelope as any;
-		return `---\nprovider: ${JSON.stringify(e.provider)}\nquery: ${JSON.stringify(e.data.query ?? "")}\n---\n\n${e.data.results.map((r: any, i: number) => `${i + 1}. [${r.title}](${r.url})${r.snippet ? `\n   ${r.snippet}` : ""}`).join("\n") || "无搜索结果"}\n`;
+	if ("provider" in envelope && "document" in envelope.data)
+		return formatExtractMarkdown(envelope as ExtractSuccessEnvelope);
+	if ("provider" in envelope && "results" in envelope.data) {
+		const e = envelope as SearchSuccessEnvelope;
+		const body = e.data.results
+			.map(
+				(result, index) =>
+					`${index + 1}. [${result.title}](${result.url})${result.snippet ? `\n   ${result.snippet}` : ""}`,
+			)
+			.join("\n");
+		return `---\nprovider: ${JSON.stringify(e.provider)}\n---\n\n${body || "无搜索结果"}\n`;
 	}
-	const e = envelope as any;
-	return `# ${e.command ?? "结果"}\n\n${JSON.stringify(e.data, null, 2)}\n`;
+	if ("command" in envelope && envelope.ok) {
+		const e = envelope as DiagnosticSuccessEnvelope | ConfigEditSuccessEnvelope;
+		return `# ${e.command}\n\n${JSON.stringify(e.data, null, 2)}\n`;
+	}
+	return "";
 }
